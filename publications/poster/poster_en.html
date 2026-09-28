@@ -2,28 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Poster A1 (EN) — Building Your Own Local AI · DJP case study</title>
+<title>Poster A1 (EN) — Building Your Own Local AI · Export-import case study</title>
 <style>
 /* ==========================================================================
-   Poster A1 potret (594 × 841 mm) — Asisten Pajak, studi kasus DJP
+   Poster A1 potret (594 × 841 mm) — Asisten Ekspor Impor, studi kasus
+   Bea Cukai dan Kementerian Keuangan
    --------------------------------------------------------------------------
-   Memakai sistem warna yang sama dengan landing page produk (biru tua dan
-   kuning emas di atas ramp netral) agar poster dan aplikasinya terbaca
-   sebagai satu hal. Tanpa web font: seluruhnya memakai huruf sistem, sehingga
-   hasil cetak identik di komputer mana pun.
+   Memakai sistem warna yang sama dengan landing page produk (navy Bea Cukai
+   dan emas lambangnya di atas ramp netral) agar poster dan aplikasinya
+   terbaca sebagai satu hal. Tanpa web font: seluruhnya memakai huruf sistem,
+   sehingga hasil cetak identik di komputer mana pun.
 
-   Render:  python render_poster.py   → poster.pdf (A1, siap cetak)
+   Render:  python render_poster.py en   → poster_en.pdf (A1, siap cetak)
    ========================================================================== */
 
 :root {
-  --navy:        #093b6e;
-  --navy-strong: #062a50;
-  --navy-text:   #093b6e;
-  --navy-wash:   #e8eef6;
-  --navy-line:   #c9d8ea;
-  --gold:        #ffc91b;
+  --navy:        #01347c;
+  --navy-strong: #02275d;
+  --navy-text:   #01347c;
+  --navy-wash:   #e6edf7;
+  --navy-line:   #c5d5ec;
+  --gold:        #f3c01a;
   --gold-text:   #7a5a00;
-  --gold-wash:   #fff6d9;
+  --gold-wash:   #fdf4d6;
   --gold-line:   #f0dc93;
 
   --page:  #ffffff;
@@ -36,8 +37,8 @@
   --ink-2: #4a4a4f;
   --ink-3: #77777d;
 
-  --dark:      #062a50;
-  --dark-deep: #041d38;
+  --dark:      #02275d;
+  --dark-deep: #011d45;
   --dark-ink:  #f2f2f0;
   --dark-ink-2: #b3c3d6;
 
@@ -68,7 +69,7 @@ body {
 /* ---------------------------------------------------------------- header */
 
 .masthead {
-  background: linear-gradient(135deg, #0b4380 0%, var(--dark) 55%, var(--dark-deep) 100%);
+  background: linear-gradient(135deg, #0b4a9a 0%, var(--dark) 55%, var(--dark-deep) 100%);
   color: var(--dark-ink);
   padding: 24mm 30mm 20mm;
   border-bottom: 3mm solid var(--gold);
@@ -76,14 +77,14 @@ body {
   overflow: hidden;
 }
 
-/* sapuan hangat samar di sudut kanan atas, memberi kedalaman pada band gelap */
+/* sapuan emas samar di sudut kanan atas, memberi kedalaman pada band gelap */
 .masthead::after {
   content: "";
   position: absolute;
   top: -70mm; right: -60mm;
   width: 240mm; height: 240mm;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,201,27,0.16) 0%, rgba(255,201,27,0) 68%);
+  background: radial-gradient(circle, rgba(243,192,26,0.16) 0%, rgba(243,192,26,0) 68%);
   z-index: 0;
 }
 
@@ -166,7 +167,7 @@ h2 + .underline {
   margin-bottom: 6mm;
 }
 
-.block + .block { margin-top: 8mm; }
+.block + .block { margin-top: 6.5mm; }
 
 /* ------------------------------------------------------------- daftar */
 
@@ -360,7 +361,7 @@ h2 + .underline {
 .creds { display: grid; gap: 4.5mm; text-align: left; }
 .cred-row {
   display: grid;
-  grid-template-columns: 40mm 1fr;
+  grid-template-columns: 52mm 1fr;
   align-items: center;
   gap: 5mm;
 }
@@ -423,7 +424,7 @@ h2 + .underline {
   background: var(--sunken);
   border: 0.5mm solid var(--line);
   border-radius: 4mm;
-  padding: 5.6mm 7mm;
+  padding: 4.4mm 7mm;
 }
 .stat .value {
   font-family: var(--display);
@@ -478,7 +479,7 @@ h2 + .underline {
   font-weight: 600;
   color: var(--ink-2);
 }
-/* bagian situs pajak.go.id dibedakan warnanya dari daftar format file */
+/* bagian situs sumber dibedakan warnanya dari daftar format file */
 .chip.ext {
   border-color: var(--gold);
   background: var(--gold-wash);
@@ -529,8 +530,9 @@ h2 + .underline {
   <div class="kicker">Faculty of Science and Technology &middot; Pradita University</div>
   <h1>Building Your Own Local AI</h1>
   <p class="tagline">Empower your organization's document search with AI</p>
-  <p>An independent case study on public information from Indonesia's
-     <b>Directorate General of Taxes (DJP)</b>. Ask any tax question in
+  <p>An independent case study on public export and import information from
+     Indonesia's <b>Directorate General of Customs and Excise (Bea Cukai)</b>
+     and <b>Ministry of Finance</b>. Ask any export or import question in
      everyday language; every answer cites <b>the regulation or page it came
      from</b>.</p>
 </header>
@@ -544,12 +546,13 @@ h2 + .underline {
       <h2>The problem</h2><div class="underline"></div>
       <ul class="points">
         <li><span class="mark">—</span>
-          <span>Tax rules are spread over <b>thousands of pages</b> on
-          pajak.go.id: laws, regulations, articles, FAQs, forms, and their
-          PDF attachments.</span></li>
+          <span>Export and import rules are spread over <b>thousands of
+          documents</b> across <b>18 ministries and agencies</b>: regulations,
+          procedures, permits, and service standards.</span></li>
         <li><span class="mark">—</span>
-          <span>One simple question can take <b>half an hour</b> of searching
-          and reading one regulation after another.</span></li>
+          <span>Every product follows <b>its own path</b>, rules change
+          without notice, and the partner country publishes <b>in another
+          language</b>.</span></li>
       </ul>
     </section>
 
@@ -563,14 +566,16 @@ h2 + .underline {
         <div class="connector"></div>
         <div class="step">
           <div class="num">2</div>
-          <div>The system searches <b>over 10,000 pages and regulations</b>
-               copied from pajak.go.id and summarises the most relevant.</div>
+          <div>The system searches <b>about 2,000 documents</b> copied from
+               beacukai.go.id and jdih.kemenkeu.go.id and summarises the most
+               relevant.</div>
         </div>
         <div class="connector"></div>
         <div class="step final">
           <div class="num">3</div>
           <div>It shows <b>evidence cards</b>: the regulation or page, the
-               quoted passage, and a link to the original on pajak.go.id.</div>
+               quoted passage, and a link to the original on the official
+               website.</div>
         </div>
       </div>
     </section>
@@ -578,23 +583,24 @@ h2 + .underline {
     <section class="block">
       <h2>What you get</h2><div class="underline"></div>
       <div class="demo">
-        <div class="demo-q"><span class="dot"></span>What are the personal income tax rates under the HPP Law?</div>
+        <div class="demo-q"><span class="dot"></span>What is import for domestic use, and which document releases the goods?</div>
         <div class="demo-a">
-          Under the HPP Law (Law 7 of 2021), annual taxable income is taxed at
-          <b>5%</b> up to IDR 60 million, <b>15%</b> up to IDR 250 million,
-          <b>25%</b> up to IDR 500 million, <b>30%</b> up to IDR 5 billion,
-          and <b>35%</b> above that<span class="cite">1</span>. Withholding on
-          employees' pay follows PP 58 of <span class="keep">2023<span class="cite">2</span>.</span>
+          Import for domestic use is an import for use or ownership by a person
+          or company domiciled in Indonesia, governed by
+          <b>PMK-190/PMK.04/2022</b> and <span class="keep"><b>PER-02/BC/2023</b><span class="cite">1</span>.</span>
+          The goods are released with an import declaration (<b>PIB</b>) for
+          each transport document, and the importer calculates the duties and
+          taxes <span class="keep">owed<span class="cite">2</span>.</span>
         </div>
         <div class="demo-sources">
           <div class="demo-source"><span class="n">1</span>
-            <span><b>UU 7 Tahun 2021 — Harmonisasi Peraturan Perpajakan</b> — Peraturan · pajak.go.id</span></div>
+            <span><b>FAQ Impor Untuk Dipakai</b> — FAQ · beacukai.go.id</span></div>
           <div class="demo-source"><span class="n">2</span>
-            <span><b>PP 58 Tahun 2023 — Tarif Pemotongan PPh Pasal 21</b> — Peraturan · pajak.go.id</span></div>
+            <span><b>Impor Untuk Dipakai</b> — Impor · beacukai.go.id</span></div>
         </div>
       </div>
-      <p class="demo-caption">Example answer. Each evidence card links to the
-         original page on pajak.go.id.</p>
+      <p class="demo-caption">Example answer, translated from Indonesian. Each
+         evidence card links to the original page on beacukai.go.id.</p>
     </section>
 
     <section class="block">
@@ -605,7 +611,7 @@ h2 + .underline {
           number, and the original page opens right away.</span></li>
         <li><span class="mark">&#10003;</span>
           <span><b>No making things up.</b> Answers come only from the indexed
-          pages. If it isn't there, the system says so.</span></li>
+          documents. If it isn't there, the system says so.</span></li>
         <li><span class="mark">&#10003;</span>
           <span><b>Dated copies.</b> Every page is stored with its original
           address and the date it was fetched.</span></li>
@@ -635,8 +641,8 @@ h2 + .underline {
 
     <section class="cta">
       <div class="cta-kicker">Try it now</div>
-      <div class="qr-frame"><img src="qr_code.png" alt="QR code to pajak.ayolearn.stream"></div>
-      <div class="cta-url">https://pajak.ayolearn.stream</div>
+      <div class="qr-frame"><img src="qr_code.png" alt="QR code to exim.ayolearn.stream"></div>
+      <div class="cta-url">https://exim.ayolearn.stream</div>
       <div class="cta-hint">Scan the QR code, or type the address above</div>
       <hr>
       <div class="creds">
@@ -649,27 +655,27 @@ h2 + .underline {
     <section class="block">
       <h2>Try asking</h2><div class="underline"></div>
       <div class="asks">
-        <div class="ask">How much income a year is tax-free (PTKP)?</div>
-        <div class="ask">How do I apply for a tax clearance letter (SKF)?</div>
-        <div class="ask">What does the Directorate General of Taxes do?</div>
+        <div class="ask">Which facilities does KITE give to exporters?</div>
+        <div class="ask">What are the rules for export duty on crude palm oil?</div>
+        <div class="ask">Which regulation sets import duty rates under the ASEAN Trade in Goods Agreement?</div>
       </div>
-      <p class="asks-note">All three already have answers in the indexed
-         pages.</p>
+      <p class="asks-note">All three already find their sources in the indexed
+         documents.</p>
     </section>
 
     <section class="block">
       <h2>Key Numbers</h2><div class="underline"></div>
       <div class="stats">
         <div class="stat">
-          <div class="value">10,250</div>
+          <div class="value">1,995</div>
           <div class="label">Documents indexed</div>
         </div>
         <div class="stat">
-          <div class="value">623K</div>
-          <div class="label">Searchable sentences</div>
+          <div class="value">55K</div>
+          <div class="label">Searchable passages</div>
         </div>
         <div class="stat">
-          <div class="value">15.9M</div>
+          <div class="value">8.6M</div>
           <div class="label">Words inside</div>
         </div>
       </div>
@@ -688,14 +694,14 @@ h2 + .underline {
         <span class="chip">Images &amp; scans (OCR)</span>
       </div>
       <p class="chips-sub">This demo indexes public content copied from
-         <b>pajak.go.id</b>:</p>
+         <b>beacukai.go.id</b> and <b>jdih.kemenkeu.go.id</b>:</p>
       <div class="chips">
-        <span class="chip ext">Regulations</span>
-        <span class="chip ext">Articles</span>
-        <span class="chip ext">Press releases</span>
+        <span class="chip ext">Procedures</span>
         <span class="chip ext">FAQ</span>
-        <span class="chip ext">Belajar Pajak</span>
-        <span class="chip ext">Forms</span>
+        <span class="chip ext">Facilities</span>
+        <span class="chip ext">Tariffs &amp; rates</span>
+        <span class="chip ext">Service standards</span>
+        <span class="chip ext">Finance regulations</span>
       </div>
       <p class="spec-line"><b>Specs:</b> Intel Core i7, 8 GB VGA, 32 GB RAM,
          10 GB storage &mdash; <b>≈ IDR 20 million</b> per unit.</p>
@@ -706,7 +712,7 @@ h2 + .underline {
 
 <footer class="footer">
   <div><b>Faculty of Science and Technology</b> &middot; Pradita University &middot; alfa.ryano@pradita.ac.id</div>
-  <div>Independent case study &middot; not an official DJP service</div>
+  <div>Independent case study &middot; not an official service of Bea Cukai or the Ministry of Finance</div>
 </footer>
 
 </body>

@@ -2,27 +2,30 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<title>Poster A1 (ID) — Building Your Own Local AI</title>
+<title>Poster A1 (ID) — Building Your Own Local AI · Studi kasus ekspor-impor</title>
 <style>
 /* ==========================================================================
-   Poster A1 potret (594 × 841 mm) — Asisten Dokumen Akreditasi
+   Poster A1 potret (594 × 841 mm) — Asisten Ekspor Impor, studi kasus
+   Bea Cukai dan Kementerian Keuangan
    --------------------------------------------------------------------------
-   Memakai sistem warna yang sama dengan landing page produk (oranye & hijau
-   Pradita di atas ramp netral) agar poster dan aplikasinya terbaca sebagai
-   satu hal. Tanpa web font: seluruhnya memakai huruf sistem, sehingga hasil
-   cetak identik di komputer mana pun.
+   Memakai sistem warna yang sama dengan landing page produk (navy Bea Cukai
+   dan emas lambangnya di atas ramp netral) agar poster dan aplikasinya
+   terbaca sebagai satu hal. Tanpa web font: seluruhnya memakai huruf sistem,
+   sehingga hasil cetak identik di komputer mana pun.
 
-   Render:  python render_poster.py   → poster.pdf (A1, siap cetak)
+   Render:  python render_poster.py id   → poster_id.pdf (A1, siap cetak)
    ========================================================================== */
 
 :root {
-  --orange:        #f26e21;
-  --orange-strong: #d95a12;
-  --orange-text:   #b34a0c;
-  --orange-wash:   #fdf0e7;
-  --green:         #405b4c;
-  --green-text:    #2f6b52;
-  --green-wash:    #e8efeb;
+  --navy:        #01347c;
+  --navy-strong: #02275d;
+  --navy-text:   #01347c;
+  --navy-wash:   #e6edf7;
+  --navy-line:   #c5d5ec;
+  --gold:        #f3c01a;
+  --gold-text:   #7a5a00;
+  --gold-wash:   #fdf4d6;
+  --gold-line:   #f0dc93;
 
   --page:  #ffffff;
   --panel: #ffffff;
@@ -34,9 +37,10 @@
   --ink-2: #4a4a4f;
   --ink-3: #77777d;
 
-  --dark:     #16181a;
-  --dark-ink: #f2f2f0;
-  --dark-ink-2: #a9adb2;
+  --dark:      #02275d;
+  --dark-deep: #011d45;
+  --dark-ink:  #f2f2f0;
+  --dark-ink-2: #b3c3d6;
 
   --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Inter, Arial, sans-serif;
   --display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Inter, Arial, sans-serif;
@@ -65,26 +69,26 @@ body {
 /* ---------------------------------------------------------------- header */
 
 .masthead {
-  background: var(--dark);
+  background: linear-gradient(135deg, #0b4a9a 0%, var(--dark) 55%, var(--dark-deep) 100%);
   color: var(--dark-ink);
   padding: 24mm 30mm 20mm;
-  border-bottom: 3mm solid var(--orange);
+  border-bottom: 3mm solid var(--gold);
   position: relative;
   overflow: hidden;
 }
 
-/* sapuan hangat samar di sudut kanan atas, memberi kedalaman pada band gelap */
+/* sapuan emas samar di sudut kanan atas, memberi kedalaman pada band gelap */
 .masthead::after {
   content: "";
   position: absolute;
   top: -70mm; right: -60mm;
   width: 240mm; height: 240mm;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(242,110,33,0.20) 0%, rgba(242,110,33,0) 68%);
+  background: radial-gradient(circle, rgba(243,192,26,0.16) 0%, rgba(243,192,26,0) 68%);
   z-index: 0;
 }
 
-/* logo resmi berwarna gelap, jadi diberi alas putih agar terbaca di band hitam */
+/* logo resmi berwarna gelap, jadi diberi alas putih agar terbaca di band gelap */
 .brand {
   position: absolute;
   top: 20mm;
@@ -102,7 +106,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.30mm;
   text-transform: uppercase;
-  color: var(--orange);
+  color: var(--gold);
   margin-bottom: 9mm;
 }
 
@@ -121,7 +125,7 @@ body {
   line-height: 1.22;
   font-weight: 600;
   letter-spacing: -0.14mm;
-  color: var(--orange);
+  color: var(--gold);
   margin-bottom: 8mm;
   max-width: 440mm;
 }
@@ -158,12 +162,12 @@ h2 {
 }
 h2 + .underline {
   width: 26mm; height: 1.5mm;
-  background: var(--orange);
+  background: var(--gold);
   border-radius: 1mm;
   margin-bottom: 6mm;
 }
 
-.block + .block { margin-top: 8mm; }
+.block + .block { margin-top: 6.5mm; }
 
 /* ------------------------------------------------------------- daftar */
 
@@ -183,9 +187,9 @@ h2 + .underline {
   font-size: 8.2mm;
   line-height: 1.42;
   font-weight: 700;
-  color: var(--orange);
+  color: var(--navy);
 }
-.points.checks .mark { color: var(--green-text); }
+.points.checks .mark { color: var(--navy-text); }
 
 /* -------------------------------------------------------------- langkah */
 
@@ -210,18 +214,18 @@ h2 + .underline {
   width: 14mm; height: 14mm;
   display: grid; place-items: center;
   border-radius: 50%;
-  background: var(--orange-wash);
-  color: var(--orange-text);
+  background: var(--navy-wash);
+  color: var(--navy-text);
   font-size: 7.6mm;
   font-weight: 700;
 }
 
 /* langkah terakhir — hasil yang dilihat pengguna */
 .step.final {
-  background: var(--green-wash);
-  border-color: #bfd2c7;
+  background: var(--gold-wash);
+  border-color: var(--gold-line);
 }
-.step.final .num { background: var(--green-text); color: #fff; }
+.step.final .num { background: var(--gold); color: var(--navy-strong); }
 
 .connector {
   width: 0.7mm;
@@ -254,7 +258,7 @@ h2 + .underline {
   flex: none;
   width: 4.6mm; height: 4.6mm;
   border-radius: 50%;
-  background: var(--orange);
+  background: var(--gold);
 }
 
 .demo-a {
@@ -269,13 +273,15 @@ h2 + .underline {
   padding: 0.4mm 1.4mm;
   margin-left: 0.6mm;
   border-radius: 1.4mm;
-  background: var(--orange-wash);
-  color: var(--orange-text);
+  background: var(--navy-wash);
+  color: var(--navy-text);
   font-size: 5.6mm;
   font-weight: 700;
   text-align: center;
   vertical-align: 1.6mm;
 }
+/* nomor sitasi tidak boleh terpisah sendirian ke baris berikutnya */
+.demo-a .keep { white-space: nowrap; }
 
 .demo-sources {
   padding: 0 6mm 5.6mm;
@@ -288,8 +294,8 @@ h2 + .underline {
   gap: 4mm;
   align-items: start;
   padding: 4.6mm 5mm;
-  background: var(--green-wash);
-  border: 0.4mm solid #cddcd3;
+  background: var(--navy-wash);
+  border: 0.4mm solid var(--navy-line);
   border-radius: 3mm;
   font-size: 6.4mm;
   line-height: 1.3;
@@ -297,7 +303,7 @@ h2 + .underline {
 }
 .demo-source .n {
   font-weight: 700;
-  color: var(--green-text);
+  color: var(--navy-text);
 }
 .demo-source b { color: var(--ink); font-weight: 600; }
 
@@ -322,7 +328,7 @@ h2 + .underline {
   font-weight: 700;
   letter-spacing: 0.6mm;
   text-transform: uppercase;
-  color: var(--orange);
+  color: var(--gold);
   margin-bottom: 8mm;
 }
 
@@ -355,7 +361,7 @@ h2 + .underline {
 .creds { display: grid; gap: 4.5mm; text-align: left; }
 .cred-row {
   display: grid;
-  grid-template-columns: 40mm 1fr;
+  grid-template-columns: 52mm 1fr;
   align-items: center;
   gap: 5mm;
 }
@@ -386,7 +392,7 @@ h2 + .underline {
 .ask {
   background: var(--panel);
   border: 0.5mm solid var(--line);
-  border-left: 2mm solid var(--orange);
+  border-left: 2mm solid var(--gold);
   border-radius: 3.4mm;
   padding: 5.6mm 6.5mm;
   font-size: 7.9mm;
@@ -418,7 +424,7 @@ h2 + .underline {
   background: var(--sunken);
   border: 0.5mm solid var(--line);
   border-radius: 4mm;
-  padding: 5.6mm 7mm;
+  padding: 4.4mm 7mm;
 }
 .stat .value {
   font-family: var(--display);
@@ -426,7 +432,7 @@ h2 + .underline {
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.3mm;
-  color: var(--orange-text);
+  color: var(--navy-text);
 }
 .stat .label {
   font-size: 7.2mm;
@@ -457,7 +463,7 @@ h2 + .underline {
 }
 .tech-opt b {
   font-weight: 700;
-  color: var(--orange-text);
+  color: var(--navy-text);
 }
 
 /* ------------------------------------------------------------- format */
@@ -473,11 +479,11 @@ h2 + .underline {
   font-weight: 600;
   color: var(--ink-2);
 }
-/* sumber luar dibedakan warnanya dari daftar format file */
+/* bagian situs sumber dibedakan warnanya dari daftar format file */
 .chip.ext {
-  border-color: var(--orange);
-  background: var(--orange-wash);
-  color: var(--orange-text);
+  border-color: var(--gold);
+  background: var(--gold-wash);
+  color: var(--gold-text);
 }
 
 .chips-sub {
@@ -493,19 +499,19 @@ h2 + .underline {
 .spec-line {
   margin-top: 5mm;
   padding: 5mm 6mm;
-  background: var(--orange-wash);
-  border: 0.5mm solid #f1cdb0;
+  background: var(--gold-wash);
+  border: 0.5mm solid var(--gold-line);
   border-radius: 3mm;
   font-size: 7.6mm;
   line-height: 1.38;
   color: var(--ink-2);
 }
-.spec-line b { color: var(--orange-text); font-weight: 700; }
+.spec-line b { color: var(--gold-text); font-weight: 700; }
 
 /* ---------------------------------------------------------------- kaki */
 
 .footer {
-  background: var(--dark);
+  background: var(--dark-deep);
   color: var(--dark-ink-2);
   padding: 8mm 30mm;
   display: flex;
@@ -524,9 +530,10 @@ h2 + .underline {
   <div class="kicker">Fakultas Sains dan Teknologi &middot; Universitas Pradita</div>
   <h1>Building Your Own Local AI</h1>
   <p class="tagline">Empower your organization's document search with AI</p>
-  <p>Tanya apa saja soal dokumen akreditasi, pakai bahasa sehari-hari.
-     Jawabannya selalu menyebutkan <b>nama file dan halaman sumbernya</b>, dan
-     dokumen itu bisa langsung Anda buka.</p>
+  <p>Studi kasus independen atas informasi publik ekspor-impor dari
+     <b>Direktorat Jenderal Bea dan Cukai</b> dan <b>Kementerian Keuangan</b>.
+     Tanyakan apa saja soal ekspor-impor dengan bahasa sehari-hari; setiap
+     jawaban menyebutkan <b>peraturan atau halaman sumbernya</b>.</p>
 </header>
 
 <main class="sheet">
@@ -538,11 +545,12 @@ h2 + .underline {
       <h2>Masalahnya</h2><div class="underline"></div>
       <ul class="points">
         <li><span class="mark">—</span>
-          <span>Bukti akreditasi tersebar di <b>ribuan file</b> pada shared
-          drive: PDF, Word, Excel, paparan, sampai hasil pindaian.</span></li>
+          <span>Aturan ekspor-impor tersebar di <b>ribuan dokumen</b> pada
+          <b>18 kementerian dan lembaga</b>.</span></li>
         <li><span class="mark">—</span>
-          <span>Satu pertanyaan asesor bisa menghabiskan <b>setengah jam</b>
-          hanya untuk membuka file satu per satu.</span></li>
+          <span>Setiap barang punya <b>jalurnya sendiri</b>, aturan berubah
+          tanpa pemberitahuan, dan negara mitra menerbitkan aturannya
+          <b>dalam bahasa lain</b>.</span></li>
       </ul>
     </section>
 
@@ -551,19 +559,20 @@ h2 + .underline {
       <div class="steps">
         <div class="step">
           <div class="num">1</div>
-          <div>Anda mengetik pertanyaan dalam <b>Bahasa Indonesia</b>.</div>
+          <div>Anda mengetik pertanyaan dalam <b>bahasa sehari-hari</b>.</div>
         </div>
         <div class="connector"></div>
         <div class="step">
           <div class="num">2</div>
-          <div>Sistem mencari dokumen-dokumen yang <b>paling relevan</b> dan
-               merangkumnya untuk Anda.</div>
+          <div>Sistem menelusuri <b>sekitar 2.000 dokumen</b> dari beacukai.go.id
+               dan jdih.kemenkeu.go.id, lalu merangkum yang paling relevan.</div>
         </div>
         <div class="connector"></div>
         <div class="step final">
           <div class="num">3</div>
-          <div>Sistem menampilkan <b>kartu bukti</b>: nama dokumen, halaman, dan
-               kutipannya. Sekali klik, file aslinya terbuka atau terunduh.</div>
+          <div>Sistem menampilkan <b>kartu bukti</b>: peraturan atau
+               halamannya, kutipan teksnya, dan tautan ke halaman asli di situs
+               resmi.</div>
         </div>
       </div>
     </section>
@@ -571,24 +580,24 @@ h2 + .underline {
     <section class="block">
       <h2>Seperti ini hasilnya</h2><div class="underline"></div>
       <div class="demo">
-        <div class="demo-q"><span class="dot"></span>Apakah bisa belajar AI dan Machine Learning di MTI?</div>
+        <div class="demo-q"><span class="dot"></span>Apa itu impor untuk dipakai dan dokumen apa yang diperlukan?</div>
         <div class="demo-a">
-          Bisa. Kurikulum MTI memuat mata kuliah <b>Machine Learning &amp; Deep
-          Learning</b> (IT240604, 4 SKS), didukung Foundation of Data Science
-          dan Applied Data Science pada peminatan yang
-          sama<span class="cite">1</span>. Capaian pembelajarannya mencakup
-          merancang solusi berbasis machine learning dan deep
-          learning<span class="cite">2</span>.
+          Impor untuk dipakai adalah impor dengan tujuan untuk dipakai atau
+          dimiliki/dikuasai oleh orang yang berdomisili di Indonesia, diatur
+          dalam <b>PMK-190/PMK.04/2022</b> dan <span class="keep"><b>PER-02/BC/2023</b><span class="cite">1</span>.</span>
+          Barangnya dikeluarkan dengan <b>PIB</b> untuk setiap dokumen kontrak
+          pengangkutan, dan importir menghitung sendiri bea masuk, cukai,
+          dan/atau PDRI yang <span class="keep">terutang<span class="cite">2</span>.</span>
         </div>
         <div class="demo-sources">
           <div class="demo-source"><span class="n">1</span>
-            <span><b>Kurikulum Prodi Magister Teknologi Informasi (MTI)</b> — Sheet: 9. Susunan Mata Kuliah</span></div>
+            <span><b>FAQ Impor Untuk Dipakai</b> — FAQ · beacukai.go.id</span></div>
           <div class="demo-source"><span class="n">2</span>
-            <span><b>Kurikulum Prodi Magister Teknologi Informasi (MTI)</b> — Sheet: 12. Pemetaan CPL-CPMK-MK</span></div>
+            <span><b>Impor Untuk Dipakai</b> — Impor · beacukai.go.id</span></div>
         </div>
       </div>
-      <p class="demo-caption">Contoh tampilan jawaban. Kartu buktinya tinggal
-         diklik untuk membuka file aslinya.</p>
+      <p class="demo-caption">Contoh jawaban. Setiap kartu bukti menaut ke
+         halaman aslinya di beacukai.go.id.</p>
     </section>
 
     <section class="block">
@@ -596,16 +605,16 @@ h2 + .underline {
       <ul class="points checks">
         <li><span class="mark">&#10003;</span>
           <span><b>Bisa langsung dicek.</b> Tiap kalimat ada nomor sumbernya,
-          dan dokumennya bisa dibuka saat itu juga.</span></li>
+          dan halaman aslinya bisa dibuka saat itu juga.</span></li>
         <li><span class="mark">&#10003;</span>
-          <span><b>Tidak mengarang.</b> Jawaban disusun dari isi dokumen. Kalau
-          tidak ada di arsip, sistem menjawab tidak ditemukan.</span></li>
+          <span><b>Tidak mengarang.</b> Jawaban disusun hanya dari dokumen yang
+          terindeks. Kalau tidak ada, sistem menjawab tidak ditemukan.</span></li>
         <li><span class="mark">&#10003;</span>
-          <span><b>Dokumen aslinya aman.</b> Sistem hanya membaca file di
-          shared drive, tidak pernah mengubahnya.</span></li>
+          <span><b>Salinan bertanggal.</b> Setiap halaman disimpan bersama
+          alamat aslinya dan tanggal pengambilannya.</span></li>
         <li><span class="mark">&#10003;</span>
           <span><b>Data tetap di kantor.</b> Semua proses berjalan di komputer
-          milik prodi sendiri.</span></li>
+          Anda sendiri.</span></li>
       </ul>
     </section>
 
@@ -615,8 +624,8 @@ h2 + .underline {
          <i>Retrieval-Augmented Generation</i>: AI hanya boleh menjawab dari
          dokumen yang ditemukan. Model AI-nya bisa diganti:</p>
       <div class="tech-opts">
-        <div class="tech-opt"><b>Lokal</b> — Qwen3 8B di komputer prodi
-          sendiri, isi dokumen tidak keluar kantor.</div>
+        <div class="tech-opt"><b>Lokal</b> — Qwen3 8B di komputer sendiri;
+          pertanyaan dan dokumen tidak keluar kantor.</div>
         <div class="tech-opt"><b>Publik</b> — ChatGPT, Gemini, atau Claude,
           bila ingin jawaban yang lebih tajam.</div>
       </div>
@@ -629,8 +638,8 @@ h2 + .underline {
 
     <section class="cta">
       <div class="cta-kicker">Coba sekarang</div>
-      <div class="qr-frame"><img src="qr_code.png" alt="Kode QR menuju akreditasi.ayolearn.stream"></div>
-      <div class="cta-url">https://akreditasi.ayolearn.stream</div>
+      <div class="qr-frame"><img src="qr_code.png" alt="Kode QR menuju exim.ayolearn.stream"></div>
+      <div class="cta-url">https://exim.ayolearn.stream</div>
       <div class="cta-hint">Pindai QR, atau ketik alamat di atas</div>
       <hr>
       <div class="creds">
@@ -643,27 +652,26 @@ h2 + .underline {
     <section class="block">
       <h2>Contoh pertanyaan</h2><div class="underline"></div>
       <div class="asks">
-        <div class="ask">Mata kuliah apa saja yang diajarkan di Prodi MTI?</div>
-        <div class="ask">Berapa jumlah mahasiswa dan lulusan prodi?</div>
-        <div class="ask">Sebutkan publikasi penelitian dosen tiga tahun terakhir.</div>
+        <div class="ask">Apa saja fasilitas KITE bagi eksportir?</div>
+        <div class="ask">Apa aturan bea keluar minyak sawit mentah (CPO)?</div>
+        <div class="ask">Peraturan apa yang menetapkan tarif bea masuk dalam ASEAN Trade in Goods Agreement?</div>
       </div>
-      <p class="asks-note">Ketiga pertanyaan ini sudah ada jawabannya di dalam
-         arsip yang terindeks.</p>
+      <p class="asks-note">Ketiganya sudah menemukan sumbernya di dokumen yang terindeks.</p>
     </section>
 
     <section class="block">
       <h2>Angka Kunci</h2><div class="underline"></div>
       <div class="stats">
         <div class="stat">
-          <div class="value">1.497</div>
+          <div class="value">1.995</div>
           <div class="label">Dokumen terindeks</div>
         </div>
         <div class="stat">
-          <div class="value">188 ribu</div>
-          <div class="label">Kalimat yang bisa dicari</div>
+          <div class="value">55 ribu</div>
+          <div class="label">Potongan teks yang bisa dicari</div>
         </div>
         <div class="stat">
-          <div class="value">3,5 juta</div>
+          <div class="value">8,6 juta</div>
           <div class="label">Kata di dalamnya</div>
         </div>
       </div>
@@ -681,13 +689,15 @@ h2 + .underline {
         <span class="chip">Teks</span>
         <span class="chip">Gambar &amp; pindaian (OCR)</span>
       </div>
-      <p class="chips-sub">Sumber luar juga bisa ditambahkan dan diindeks,
-         seperti:</p>
+      <p class="chips-sub">Demo ini mengindeks konten publik yang disalin dari
+         <b>beacukai.go.id</b> dan <b>jdih.kemenkeu.go.id</b>:</p>
       <div class="chips">
-        <span class="chip ext">PDDikti</span>
-        <span class="chip ext">SINTA</span>
-        <span class="chip ext">Google Scholar</span>
-        <span class="chip ext">Situs kampus</span>
+        <span class="chip ext">Prosedur</span>
+        <span class="chip ext">FAQ</span>
+        <span class="chip ext">Fasilitas</span>
+        <span class="chip ext">Tarif &amp; kurs</span>
+        <span class="chip ext">Standar pelayanan</span>
+        <span class="chip ext">Peraturan Menkeu (PMK)</span>
       </div>
       <p class="spec-line"><b>Spesifikasi:</b> Intel Core i7, VGA 8 GB, RAM
          32 GB, penyimpanan 10 GB &mdash; <b>± Rp 20 juta</b> per unit.</p>
@@ -698,7 +708,7 @@ h2 + .underline {
 
 <footer class="footer">
   <div><b>Fakultas Sains dan Teknologi</b> &middot; Universitas Pradita &middot; alfa.ryano@pradita.ac.id</div>
-  <div>Berjalan di satu komputer kantor &middot; dokumen tidak pernah diubah</div>
+  <div>Studi kasus independen &middot; bukan layanan resmi Bea Cukai atau Kementerian Keuangan</div>
 </footer>
 
 </body>
