@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="id" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom-Local AI: Asisten Ekspor Impor</title>
+  <meta name="description" content="Tanya jawab atas informasi publik ekspor-impor — prosedur kepabeanan, larangan dan pembatasan, tarif, dan fasilitas — dengan sitasi ke sumbernya di setiap jawaban.">
+  <meta name="theme-color" content="#01347c">
+  <!-- ?v= is the file's content hash. Cloudflare tells browsers to keep static
+       files for 4 hours, so a changed file needs a new address to reach them:
+       update the value (here and on landing.js) whenever the file changes. -->
+  <link rel="stylesheet" href="/static/landing.css?v=edb51474">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚢</text></svg>">
+</head>
+<body>
+  <a class="skip-link" href="#masuk">Langsung ke formulir masuk</a>
+
+  <!-- ============================== NAV ============================== -->
+  <header class="nav" id="nav">
+    <div class="container nav-inner">
+      <a class="brand" href="/" aria-label="Custom-Local AI: Asisten Ekspor Impor, beranda">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="30" height="30">
+            <rect x="2" y="2" width="28" height="28" rx="8" fill="currentColor"/>
+            <path d="M10 22V10h7.2a4.2 4.2 0 0 1 0 8.4H13.4M16.5 18.4 22 22" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span class="brand-text">Custom-Local AI<span class="brand-accent">Asisten Ekspor Impor</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Navigasi utama">
+        <a href="#fitur">Fitur</a>
+        <a href="#cara-kerja">Cara Kerja</a>
+        <a href="#hak-akses">Hak Akses</a>
+        <a href="#keamanan">Keamanan</a>
+      </nav>
+      <a class="btn btn-primary btn-small" href="#masuk" data-signed-out>Masuk</a>
+      <a class="btn btn-primary btn-small hidden" href="/app" data-signed-in>Buka Aplikasi →</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============================== HERO ============================== -->
+    <section class="hero">
+      <div class="hero-backdrop" aria-hidden="true">
+        <div class="glow glow-orange"></div>
+        <div class="glow glow-green"></div>
+        <div class="grid-lines"></div>
+      </div>
+
+      <div class="container hero-inner">
+        <div class="hero-copy">
+          <p class="eyebrow reveal">
+            <span class="eyebrow-dot" aria-hidden="true"></span>
+            Studi Kasus &middot; Ekspor Impor
+          </p>
+          <a class="promo reveal" href="#masuk">
+            Butuh AI lokal yang disesuaikan untuk organisasi Anda?
+            <span class="promo-cta">Coba demo ini …</span>
+          </a>
+          <h1 class="hero-title reveal">
+            Menjawab pertanyaan ekspor-impor,
+            <span class="gradient-text">lengkap dengan dasar hukumnya.</span>
+          </h1>
+          <p class="hero-lede reveal">
+            Tanyakan apa saja tentang PIB, PEB, larangan dan pembatasan, tarif,
+            fasilitas KITE dan kawasan berikat, hingga CEISA. Sistem menelusuri
+            salinan halaman Bea Cukai dan sumber resmi lainnya, lalu menjawab dengan
+            sitasi yang bisa langsung Anda periksa. Demo independen, bukan layanan
+            resmi pemerintah.
+          </p>
+
+          <div class="hero-actions reveal">
+            <a class="btn btn-primary btn-large" href="#masuk" data-signed-out>Masuk sekarang</a>
+            <a class="btn btn-primary btn-large hidden" href="/app" data-signed-in>Buka Aplikasi →</a>
+            <a class="btn btn-ghost btn-large" href="#cara-kerja">Lihat cara kerjanya</a>
+          </div>
+
+          <dl class="stat-strip reveal" id="stat-strip" aria-live="polite">
+            <div class="stat">
+              <dt>Dokumen</dt>
+              <dd><span data-counter="document_count">–</span></dd>
+            </div>
+            <div class="stat">
+              <dt>Potongan teks</dt>
+              <dd><span data-counter="chunk_count">–</span></dd>
+            </div>
+            <div class="stat">
+              <dt>Folder</dt>
+              <dd><span data-counter="folder_count">–</span></dd>
+            </div>
+            <div class="stat">
+              <dt>Diperbarui</dt>
+              <dd class="stat-date" id="stat-updated">–</dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- ------------------------- SIGN-IN CARD ------------------------- -->
+        <div class="auth-column reveal" id="masuk">
+          <div class="auth-card" id="auth-card">
+            <div class="auth-signed-in hidden" id="auth-signed-in">
+              <div class="auth-avatar" id="auth-avatar" aria-hidden="true">A</div>
+              <h2 class="auth-title">Selamat datang kembali</h2>
+              <p class="auth-subtitle">Anda masuk sebagai <strong id="auth-current-name">admin</strong>
+                <span class="role-pill" id="auth-current-role">Admin</span></p>
+              <a class="btn btn-primary btn-block" href="/app">Buka Aplikasi →</a>
+              <button class="btn btn-ghost btn-block" type="button" id="button-sign-out">Keluar</button>
+            </div>
+
+            <div id="auth-signed-out">
+              <h2 class="auth-title">Masuk ke <span class="keep-together">Custom-Local AI</span></h2>
+              <p class="auth-subtitle">Gunakan akun Admin atau Guest Anda.</p>
+
+              <!-- ===== DEMO PAMERAN — HAPUS SELURUH BLOK INI SETELAH PAMERAN =====
+                   Menampilkan kredensial tamu agar pengunjung dapat mencoba
+                   tanpa bertanya. Pasangannya: blok bertanda sama di
+                   landing.css dan landing.js. Sedang disembunyikan dengan
+                   kelas `hidden`; hapus kelas itu untuk menampilkannya lagi. -->
+              <div class="demo-credentials hidden">
+                <p class="demo-credentials-title">Coba dulu sebagai tamu</p>
+                <dl class="demo-credentials-list">
+                  <dt>Nama pengguna</dt><dd><code>guest</code></dd>
+                  <dt>Kata sandi</dt><dd><code>i am guest</code></dd>
+                </dl>
+                <button class="btn btn-ghost btn-block" type="button" id="button-fill-guest">
+                  Isikan otomatis
+                </button>
+              </div>
+              <!-- ===== AKHIR DEMO PAMERAN ===== -->
+
+              <form class="auth-panel" id="sign-in-form" novalidate>
+                <label class="field">
+                  <span class="field-label">Nama pengguna</span>
+                  <input class="input" type="text" id="input-username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+                </label>
+                <label class="field">
+                  <span class="field-label">Kata sandi</span>
+                  <span class="password-wrap">
+                    <input class="input" type="password" id="input-password" name="password" autocomplete="current-password" required>
+                    <button class="reveal-password" type="button" id="button-toggle-password" aria-label="Tampilkan kata sandi" aria-pressed="false">
+                      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+                    </button>
+                  </span>
+                </label>
+                <p class="caps-hint hidden" id="caps-hint">Caps Lock aktif</p>
+                <p class="form-error hidden" id="sign-in-error" role="alert"></p>
+                <button class="btn btn-primary btn-block" type="submit" id="button-sign-in">
+                  <span class="btn-label">Masuk</span>
+                  <span class="spinner" aria-hidden="true"></span>
+                </button>
+              </form>
+
+              <div class="role-hints" aria-label="Hak akses per peran">
+                <div class="role-hint">
+                  <span class="role-pill">Admin</span>
+                  <span>Akses penuh, termasuk memperbarui dan membangun ulang indeks.</span>
+                </div>
+                <div class="role-hint">
+                  <span class="role-pill guest">Guest</span>
+                  <span>Tanya jawab dan telusuri seluruh dokumen, tanpa mengubah indeks.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ------------------------- PRODUCT DEMO ------------------------- -->
+      <div class="container">
+        <figure class="demo reveal" aria-label="Contoh tanya jawab">
+          <div class="demo-chrome" aria-hidden="true">
+            <span></span><span></span><span></span>
+            <div class="demo-url">custom-local-ai / tanya-jawab</div>
+          </div>
+          <div class="demo-body">
+            <div class="demo-question">
+              <span class="demo-avatar">A</span>
+              <p id="demo-question-text">Apa itu impor untuk dipakai, dan dokumen apa yang dipakai untuk mengeluarkan barangnya?</p>
+            </div>
+            <div class="demo-answer">
+              <span class="demo-avatar demo-avatar-ai" aria-hidden="true">✦</span>
+              <div class="demo-answer-body">
+                <p id="demo-answer-text" class="demo-typing">Impor untuk dipakai adalah impor dengan tujuan untuk dipakai atau dimiliki/dikuasai oleh orang yang berdomisili di Indonesia, diatur dalam <strong>PMK-190/PMK.04/2022</strong> dan <strong>PER-02/BC/2023</strong><span class="chip">1</span>. Barangnya dikeluarkan dengan <strong>PIB</strong> untuk setiap dokumen kontrak pengangkutan; importir membuat PIB berdasarkan Dokumen Pelengkap Pabean dan menghitung sendiri bea masuk, cukai, dan/atau PDRI yang terutang<span class="chip">2</span>.</p>
+                <div class="demo-sources">
+                  <div class="source-card">
+                    <span class="source-num">1</span>
+                    <div>
+                      <strong>FAQ Impor Untuk Dipakai.txt</strong>
+                      <span>Bea Cukai › FAQ</span>
+                    </div>
+                    <span class="source-score">0,94</span>
+                  </div>
+                  <div class="source-card">
+                    <span class="source-num">2</span>
+                    <div>
+                      <strong>Impor Untuk Dipakai.txt</strong>
+                      <span>Bea Cukai › Impor</span>
+                    </div>
+                    <span class="source-score">0,88</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption class="demo-caption">Ilustrasi. Setiap angka dalam lingkaran menaut ke halaman atau peraturan sumbernya.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ============================== CTA ============================== -->
+    <section class="section cta">
+      <div class="container cta-inner reveal">
+        <p class="cta-kicker">Custom-Local AI</p>
+        <h2>AI lokal, disesuaikan untuk organisasi Anda.</h2>
+        <p class="cta-lede">Demo ini mengelola informasi publik ekspor-impor dari situs pemerintah
+          seperti Bea Cukai, lalu merangkumnya dengan AI. Sistem serupa dapat disiapkan untuk dokumen organisasi Anda sendiri.</p>
+        <ul class="cta-points">
+          <li><strong>Dokumen menumpuk?</strong> Tanyakan saja dalam bahasa <span class="keep-together">sehari-hari</span>; AI yang mencari dan merangkumnya.</li>
+          <li><strong>Data tetap di kantor.</strong> AI berjalan di komputer Anda sendiri, tanpa mengirim dokumen ke internet.</li>
+          <li><strong>Cukup satu komputer.</strong> Tidak perlu server besar atau langganan layanan awan.</li>
+        </ul>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-large" href="#masuk" data-signed-out>Coba demo ini</a>
+          <a class="btn btn-primary btn-large hidden" href="/app" data-signed-in>Buka Aplikasi →</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ FEATURES ============================ -->
+    <section class="section" id="fitur">
+      <div class="container">
+        <header class="section-head reveal">
+          <p class="section-kicker">Fitur</p>
+          <h2 class="section-title">Dibuat untuk pertanyaan ekspor-impor yang jawabannya harus bisa dipertanggungjawabkan.</h2>
+        </header>
+
+        <div class="feature-grid">
+          <article class="feature feature-wide reveal">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 8h10M7 12h6M5 20l3-3h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14Z"/></svg>
+            </div>
+            <h3>Sitasi di setiap jawaban</h3>
+            <p>Jawaban tidak pernah berdiri sendiri. Setiap klaim menaut ke peraturan, halaman, dan potongan teks asalnya, sehingga dasar hukumnya dapat diperiksa dalam satu klik.</p>
+            <div class="feature-visual" aria-hidden="true">
+              <span class="chip">1</span><span class="chip">2</span><span class="chip">3</span>
+              <span class="feature-visual-line"></span>
+            </div>
+          </article>
+
+          <article class="feature reveal">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
+            </div>
+            <h3>Pencarian hibrida</h3>
+            <p>Makna dan kata kunci digabung, lalu diperingkat ulang oleh cross-encoder. Istilah seperti “KITE” dan nomor seperti “PMK-190/PMK.04/2022” tetap ditemukan dengan tepat.</p>
+          </article>
+
+          <article class="feature reveal">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            </div>
+            <h3>Baca-saja, selalu</h3>
+            <p>Salinan situs sumber hanya dibaca. Indeks disimpan terpisah, dan server menolak berjalan bila konfigurasinya berisiko menulis ke korpus.</p>
+          </article>
+
+          <article class="feature reveal">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            </div>
+            <h3>Halaman web, PDF, Excel</h3>
+            <p>Halaman situs, lampiran peraturan, dan formulir dibaca menjadi teks, termasuk halaman hasil pindai melalui OCR bila diaktifkan.</p>
+          </article>
+
+          <article class="feature reveal">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+            </div>
+            <h3>Percakapan tersimpan</h3>
+            <p>Lanjutkan pertanyaan kemarin tanpa mengulang konteks. Pertanyaan lanjutan dipahami dalam alur percakapannya.</p>
+          </article>
+
+          <article class="feature reveal">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/></svg>
+            </div>
+            <h3>Salinan bertanggal, tautan asli</h3>
+            <p>Setiap halaman disimpan beserta URL dan waktu pengambilannya. Dari sitasi, buka halaman aslinya di situs sumber atau unduh salinannya.</p>
+          </article>
+
+          <article class="feature feature-wide reveal">
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6.3 6.3l2.1 2.1M15.6 15.6l2.1 2.1M6.3 17.7l2.1-2.1M15.6 8.4l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <h3>Pilih model bahasa</h3>
+            <p>Jalankan sepenuhnya lokal lewat Ollama sehingga dokumen tidak meninggalkan komputer, atau gunakan model awan untuk penalaran yang lebih dalam.</p>
+            <div class="model-tags" aria-label="Model yang didukung">
+              <span>Ollama · lokal</span><span>Claude</span><span>Codex</span><span>Gemini</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================== HOW IT WORKS =========================== -->
+    <section class="section section-tinted" id="cara-kerja">
+      <div class="container">
+        <header class="section-head reveal">
+          <p class="section-kicker">Cara Kerja</p>
+          <h2 class="section-title">Dari ribuan halaman ke satu jawaban yang bisa diperiksa, dalam empat langkah.</h2>
+        </header>
+
+        <ol class="pipeline">
+          <li class="pipeline-step reveal">
+            <span class="step-number">01</span>
+            <h3>Salin &amp; indeks</h3>
+            <p>Halaman dan dokumen situs sumber disalin, dipecah menjadi potongan ±450 token, lalu diubah menjadi vektor makna serta indeks kata kunci.</p>
+          </li>
+          <li class="pipeline-step reveal">
+            <span class="step-number">02</span>
+            <h3>Temukan</h3>
+            <p>Pertanyaan dicocokkan secara semantik dan leksikal sekaligus, lalu hasilnya digabung.</p>
+          </li>
+          <li class="pipeline-step reveal">
+            <span class="step-number">03</span>
+            <h3>Peringkat ulang</h3>
+            <p>Cross-encoder membaca ulang kandidat teratas dan memilih yang benar-benar relevan.</p>
+          </li>
+          <li class="pipeline-step reveal">
+            <span class="step-number">04</span>
+            <h3>Jawab &amp; sitasi</h3>
+            <p>Model bahasa hanya menjawab dari potongan terpilih dan menandai setiap sumbernya.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============================== ROLES ============================== -->
+    <section class="section" id="hak-akses">
+      <div class="container">
+        <header class="section-head reveal">
+          <p class="section-kicker">Hak Akses</p>
+          <h2 class="section-title">Dua peran, batas yang jelas.</h2>
+        </header>
+
+        <div class="role-grid">
+          <article class="role-card reveal">
+            <div class="role-head">
+              <span class="role-dot role-dot-guest" aria-hidden="true">G</span>
+              <div>
+                <h3>Guest</h3>
+                <p>Untuk eksportir, importir, PPJK, mahasiswa, dan pengunjung demo.</p>
+              </div>
+            </div>
+            <ul class="role-list">
+              <li><span class="check">✓</span> Tanya jawab dengan sitasi</li>
+              <li><span class="check">✓</span> Telusuri potongan dokumen</li>
+              <li><span class="check">✓</span> Daftar dokumen &amp; unduhan</li>
+              <li><span class="check">✓</span> Riwayat percakapan</li>
+              <li class="muted"><span class="cross">✕</span> Perbarui indeks</li>
+              <li class="muted"><span class="cross">✕</span> Bangun ulang indeks</li>
+            </ul>
+          </article>
+
+          <article class="role-card role-card-admin reveal">
+            <div class="role-head">
+              <span class="role-dot role-dot-admin" aria-hidden="true">A</span>
+              <div>
+                <h3>Admin</h3>
+                <p>Untuk pengelola sistem dan pembaruan data.</p>
+              </div>
+            </div>
+            <ul class="role-list">
+              <li><span class="check">✓</span> Semua yang dapat dilakukan Guest</li>
+              <li><span class="check">✓</span> Perbarui indeks saat salinan diperbarui</li>
+              <li><span class="check">✓</span> Bangun ulang indeks dari nol</li>
+              <li><span class="check">✓</span> Pantau log dan progres indexing</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SECURITY ============================ -->
+    <section class="section section-dark" id="keamanan">
+      <div class="container security">
+        <div class="security-copy reveal">
+          <p class="section-kicker">Keamanan</p>
+          <h2 class="section-title">Data tetap di bawah kendali Anda.</h2>
+          <p>Sistem berjalan di komputer sendiri. Dengan model lokal, pertanyaan dan dokumen tidak keluar dari jaringan. Saat memakai model awan, antarmuka menyatakannya dengan jelas sebelum Anda bertanya.</p>
+        </div>
+        <ul class="security-list">
+          <li class="reveal">
+            <strong>Sesi bertanda tangan</strong>
+            <span>Cookie HttpOnly dengan tanda tangan HMAC-SHA256; tidak dapat dibaca skrip maupun dipalsukan.</span>
+          </li>
+          <li class="reveal">
+            <strong>Kata sandi di-hash</strong>
+            <span>PBKDF2-SHA256 dengan 600.000 iterasi. Kata sandi asli tidak pernah disimpan.</span>
+          </li>
+          <li class="reveal">
+            <strong>Perlindungan tebakan</strong>
+            <span>Alamat yang lima kali salah memasukkan kata sandi dikunci sementara.</span>
+          </li>
+          <li class="reveal">
+            <strong>Hak akses di server</strong>
+            <span>Pembatasan peran diperiksa di server, bukan hanya disembunyikan di tampilan.</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <span>© <span id="footer-year">2026</span> Magister Teknik Informatika, Universitas Pradita</span>
+      <span class="footer-muted">Custom-Local AI: Asisten Ekspor Impor &middot; <span class="keep-together">Studi kasus ekspor-impor, bukan layanan resmi pemerintah</span></span>
+    </div>
+  </footer>
+
+  <script src="/static/landing.js?v=e74d71ba"></script>
+</body>
+</html>

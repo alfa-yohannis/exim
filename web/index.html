@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <!-- `interactive-widget` makes Chrome on Android shrink the page when the
+       on-screen keyboard opens, so the question box stays above it. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+  <title>Custom-Local AI: Asisten Ekspor Impor</title>
+  <!-- ?v= is the file's content hash. Cloudflare tells browsers to keep static
+       files for 4 hours, so a changed file needs a new address to reach them:
+       update the value (here and on app.js) whenever the file changes. -->
+  <link rel="stylesheet" href="/static/styles.css?v=162a5cac">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚢</text></svg>">
+</head>
+<body>
+  <div class="layout" id="layout">
+
+    <!-- ============================ SIDEBAR ============================ -->
+    <!-- A collapsible column on wide screens, a drawer on phones; the burger
+         button in the tab bar drives both (SidebarController in app.js). -->
+    <aside class="sidebar" id="sidebar">
+      <header class="sidebar-header">
+        <h1>Custom-Local AI <span class="title-descriptor">Asisten Ekspor Impor</span></h1>
+        <p class="subtitle">Studi kasus: informasi publik ekspor-impor</p>
+        <button class="sidebar-close" id="button-sidebar-close" type="button"
+                aria-label="Tutup panel samping" title="Tutup panel samping">✕</button>
+      </header>
+
+      <div class="account-bar" id="account-bar">
+        <span class="account-avatar" id="account-avatar" aria-hidden="true">?</span>
+        <span class="account-identity">
+          <span class="account-name" id="account-name">memuat…</span>
+          <span class="role-badge" id="account-role"></span>
+        </span>
+        <button class="button ghost compact" id="button-logout" type="button">Keluar</button>
+      </div>
+
+      <section class="panel">
+        <h2>Percakapan</h2>
+        <div class="button-row">
+          <button class="button primary" id="button-new-session">+ Percakapan Baru</button>
+        </div>
+        <div class="session-list" id="session-list">
+          <p class="session-empty">Belum ada percakapan tersimpan.</p>
+        </div>
+      </section>
+
+      <!-- Hidden until the session is known; shown to admins only. -->
+      <section class="panel hidden" id="panel-source">
+        <h2>Sumber Dokumen</h2>
+        <div class="source-path" id="source-path">memuat…</div>
+        <div class="readonly-badge" title="Sistem ini tidak pernah menulis ke direktori sumber">
+          <span class="lock-icon">🔒</span> Akses baca-saja
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Status Indeks</h2>
+        <div class="stat-grid">
+          <div class="stat"><span class="stat-value" id="stat-documents">–</span><span class="stat-label">Dokumen</span></div>
+          <div class="stat"><span class="stat-value" id="stat-chunks">–</span><span class="stat-label">Potongan</span></div>
+          <div class="stat"><span class="stat-value" id="stat-megabytes">–</span><span class="stat-label">MB</span></div>
+          <div class="stat"><span class="stat-value" id="stat-failed">–</span><span class="stat-label">Gagal</span></div>
+        </div>
+        <div class="muted-line" id="stat-last-indexed">Belum pernah diindeks</div>
+        <div class="muted-line warning-line hidden" id="stat-scanned"></div>
+
+        <div class="button-row">
+          <button class="button primary" id="button-ingest">Perbarui Indeks</button>
+          <button class="button ghost" id="button-rebuild" title="Hapus indeks dan baca ulang seluruh dokumen">Bangun Ulang</button>
+        </div>
+        <div class="permission-notice hidden" id="permission-notice" role="alert"></div>
+
+        <div class="progress-block hidden" id="ingest-progress">
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          <div class="progress-caption" id="progress-caption"></div>
+          <div class="progress-detail" id="progress-detail"></div>
+          <details class="progress-log">
+            <summary>Log proses</summary>
+            <pre id="progress-log-text"></pre>
+          </details>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Model Bahasa</h2>
+        <label class="field-label" for="select-backend">Backend</label>
+        <select id="select-backend" class="select"></select>
+        <div class="backend-status" id="backend-status"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Pencarian</h2>
+        <label class="field-label" for="select-folder">Batasi ke folder</label>
+        <select id="select-folder" class="select">
+          <option value="">Semua folder</option>
+        </select>
+
+        <label class="field-label" for="input-passages">
+          Jumlah sumber: <strong id="passage-count-label">6</strong>
+        </label>
+        <input type="range" id="input-passages" class="slider" min="3" max="15" value="6">
+      </section>
+
+      <section class="panel hidden" id="panel-device" data-admin-only>
+        <h2>Perangkat</h2>
+        <div class="muted-line" id="hardware-line">–</div>
+        <div class="muted-line" id="embedding-line">–</div>
+        <div class="muted-line" id="reranker-line">–</div>
+        <div class="muted-line" id="ocr-line">–</div>
+        <div class="muted-line" id="client-line">–</div>
+      </section>
+    </aside>
+
+    <!-- Dims the conversation behind the open drawer on a phone; tap to close. -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+
+    <!-- ============================= MAIN ============================= -->
+    <main class="main">
+      <nav class="tabs">
+        <button class="sidebar-toggle" id="button-sidebar-toggle" type="button"
+                aria-controls="sidebar" aria-expanded="true"
+                aria-label="Sembunyikan panel samping" title="Sembunyikan panel samping">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 6.5h16M4 12h16M4 17.5h16" />
+          </svg>
+        </button>
+        <button class="tab active" data-tab="ask">Tanya Jawab</button>
+        <!-- Administrators only: hidden until the account is known. -->
+        <button class="tab hidden" data-tab="browse" data-admin-only>Telusuri Potongan</button>
+        <button class="tab hidden" data-tab="documents" data-admin-only>Daftar Dokumen</button>
+        <a class="tab-link" href="/docs" target="_blank" rel="noopener noreferrer"
+           title="Dokumentasi REST API (Swagger UI) — terbuka di tab baru">Dokumentasi API ↗</a>
+      </nav>
+
+      <!-- ---------------------------- ASK ---------------------------- -->
+      <section class="tab-panel active" id="panel-ask">
+        <div class="conversation-toolbar hidden" id="conversation-toolbar">
+          <span class="toolbar-label">Panel sumber</span>
+          <button class="toolbar-button" id="button-expand-sources">Buka semua</button>
+          <button class="toolbar-button" id="button-collapse-sources">Tutup semua</button>
+        </div>
+        <div class="conversation" id="conversation">
+          <div class="welcome">
+            <h2>Tanyakan apa saja tentang ekspor-impor</h2>
+            <p>Jawaban disusun dari salinan halaman dan dokumen publik situs pemerintah terkait ekspor-impor, seperti Bea Cukai, selalu disertai sitasi ke sumbernya. Ini demo, bukan layanan resmi pemerintah.</p>
+            <div class="example-questions" id="example-questions">
+              <button class="example">Apa itu impor untuk dipakai dan dokumen apa yang diperlukan?</button>
+              <button class="example">Apa saja fasilitas Kemudahan Impor Tujuan Ekspor (KITE)?</button>
+              <button class="example">Bagaimana ketentuan bea masuk untuk barang kiriman dari luar negeri?</button>
+              <button class="example">Bagaimana cara mengajukan keberatan atas penetapan nilai pabean?</button>
+            </div>
+          </div>
+        </div>
+
+        <form class="composer" id="composer">
+          <textarea id="input-question" class="composer-input" rows="1"
+                    placeholder="Tulis pertanyaan… (Enter untuk kirim, Shift+Enter baris baru)"></textarea>
+          <button type="submit" class="button primary send" id="button-send">Kirim</button>
+          <button type="button" class="button ghost hidden" id="button-stop">Hentikan</button>
+        </form>
+      </section>
+
+      <!-- --------------------------- BROWSE -------------------------- -->
+      <section class="tab-panel" id="panel-browse">
+        <form class="browse-form" id="browse-form">
+          <input type="text" id="input-browse" class="text-input"
+                 placeholder="Cari potongan dokumen tanpa membuat jawaban…">
+          <button type="submit" class="button primary">Cari</button>
+        </form>
+        <div class="passage-list" id="browse-results">
+          <p class="empty-hint">Masukkan kata kunci untuk melihat potongan dokumen yang paling relevan, lengkap dengan skor pencarian semantik dan kata kunci.</p>
+        </div>
+      </section>
+
+      <!-- ------------------------- DOCUMENTS ------------------------- -->
+      <section class="tab-panel" id="panel-documents">
+        <div class="document-toolbar">
+          <input type="text" id="input-document-filter" class="text-input" placeholder="Saring berdasarkan nama atau folder…">
+          <select id="select-document-status" class="select compact">
+            <option value="">Semua status</option>
+            <option value="indexed">Terindeks</option>
+            <option value="empty">Kosong / hasil pindai</option>
+            <option value="failed">Gagal dibaca</option>
+          </select>
+          <button class="button ghost" id="button-refresh-documents">Muat Ulang</button>
+        </div>
+        <div class="document-table-wrapper">
+          <table class="document-table">
+            <thead>
+              <tr>
+                <th>Dokumen</th><th>Folder</th><th>Status</th>
+                <th class="numeric">Ukuran</th>
+                <th class="numeric">Potongan</th><th class="numeric">Bagian</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="document-rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <!-- Markdown rendering for answers. Vendored locally rather than loaded from
+       a CDN so the interface keeps working without internet access. -->
+  <script src="/static/vendor/marked.min.js"></script>
+  <script src="/static/vendor/purify.min.js"></script>
+  <script src="/static/app.js?v=88261846"></script>
+</body>
+</html>

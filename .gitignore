@@ -1,0 +1,88 @@
+# =============================================================================
+# Exim RAG — berkas yang tidak masuk kendali versi
+# =============================================================================
+
+# --- Rahasia -----------------------------------------------------------------
+# .env memuat kredensial (mis. akun SINTA). Jangan pernah dikomit.
+# `.env.example` sengaja dikecualikan agar contoh konfigurasi tetap ikut.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*credentials*.json
+*secrets*.json
+
+# --- Artefak yang dihasilkan sistem ------------------------------------------
+# Indeks, vektor, riwayat percakapan, cache model, profil browser, dan log —
+# seluruhnya dapat dibangun ulang dan berukuran beberapa gigabita.
+data/
+
+# --- Salinan dokumen ---------------------------------------------------------
+# corpus-lokal memuat salinan materi akreditasi internal beserta salinan
+# halaman SINTA/Scholar/PDDikti. Sumber aslinya tetap di shared drive, dan
+# isinya dapat dibuat ulang dengan `main.py snapshot`.
+corpus-lokal/
+
+# Salinan situs hasil crawl (corpus-exim): dapat berukuran gigabita dan dapat
+# dibuat ulang dengan `main.py crawl`.
+corpus-*/
+
+# --- Lingkungan dan cache Python ---------------------------------------------
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- Cakupan pengujian -------------------------------------------------------
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Pengaturan lokal per-mesin ----------------------------------------------
+# `.vscode/settings.json` sengaja DIIKUTKAN: isinya menunjuk interpreter venv
+# proyek dan berguna bagi siapa pun yang membuka repositori ini. Yang
+# dikecualikan hanyalah berkas yang khusus mesin masing-masing.
+.claude/settings.local.json
+.claude/*.local.json
+# Riwayat izin perintah Claude Code di mesin ini, penuh path lokal, beserta
+# salinan sementara yang ditulis saat menyimpannya.
+.claude/settings.json*
+.vscode/*
+!.vscode/settings.json
+.idea/
+
+# --- Berkas sementara dan kunci ----------------------------------------------
+# `~$...` adalah berkas kunci yang ditinggalkan Word dan Excel saat dokumen
+# sedang dibuka.
+~$*
+*.tmp
+*.temp
+*.bak
+*.log
+*.swp
+*~
+
+# --- Sistem operasi ----------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# --- Artefak build LaTeX (publications/paper) ---------------------------------
+*.aux
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk

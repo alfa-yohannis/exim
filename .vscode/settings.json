@@ -1,0 +1,24 @@
+{
+  // Gunakan interpreter dari virtual environment proyek, bukan Python sistem.
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "python.terminal.activateEnvironment": true,
+
+  // Agar "from app.config import ..." dikenali oleh analisis kode.
+  "python.analysis.extraPaths": ["${workspaceFolder}"],
+
+  // Penemuan pengujian lewat panel Testing.
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests"],
+
+  // Direktori besar dan hasil generate — dikecualikan agar pencarian tetap cepat.
+  "search.exclude": {
+    "**/.venv": true,
+    "**/data": true,
+    "**/__pycache__": true
+  },
+  "files.watcherExclude": {
+    "**/.venv/**": true,
+    "**/data/**": true
+  }
+}
