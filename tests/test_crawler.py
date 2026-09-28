@@ -221,3 +221,113 @@ class TestSiteCrawler:
     def test_rejects_an_unknown_section(self, isolated_settings, guard):
         with pytest.raises(ValueError):
             SiteCrawler(isolated_settings, guard).run(self.SITE, section_names=["Tidak Ada"])
+
+
+def _page(title: str, body: str = "isi peraturan " * 30, links: str = "") -> str:
+    return f"<html><head><title>{title}</title></head><body><p>{body}</p>{links}</body></html>"
+
+
+class _CountingFetcher:
+    """Serves canned pages and files, and records every request made."""
+
+    PAGES: dict[str, str] = {}
+    SIZES: dict[str, int | None] = {}
+    requests: list[tuple[str, str]] = []
+
+    def __init__(self, _settings) -> None:
+        pass
+
+    def get_text(self, url: str) -> str:
+        self.requests.append(("GET", url))
+        return self.PAGES[url]
+
+    def size_of(self, url: str) -> int | None:
+        self.requests.append(("HEAD", url))
+        return self.SIZES.get(url)
+
+    def download(self, url, target_for, maximum_bytes):
+        self.requests.append(("DOWNLOAD", url))
+        target = target_for(Path(url).name)
+        target.write_bytes(b"%PDF-1.4")
+        return target, 8
+
+
+class TestScopeAndOrdering:
+    """Sitemap listings, title filters, excluded files, and smallest-first downloads."""
+
+    ROOT = "https://www.example.go.id"
+    SITEMAP = f"""<?xml version="1.0"?><urlset>
+        <url><loc>{ROOT}/dok/pmk-1</loc></url>
+        <url><loc>{ROOT}/dok/pmk-2</loc></url>
+        <url><loc>https://elsewhere.example.com/dok/pmk-3</loc></url>
+        <url><loc>{ROOT}/tentang</loc></url></urlset>"""
+
+    SITE = CrawlSite(
+        key="regulasi",
+        folder="Regulasi",
+        root=ROOT,
+        hosts=frozenset({"www.example.go.id"}),
+        content_selectors=("body",),
+        attachment_exclude_patterns=(r"/abstrak/",),
+        sections=(
+            CrawlSection(
+                folder="PMK",
+                listing_urls=(f"{ROOT}/sitemap.xml",),
+                detail_pattern=r"^/dok/pmk-\d+$",
+                paginate=False,
+                title_pattern=r"bea masuk",
+                smallest_attachments_first=True,
+            ),
+        ),
+    )
+
+    @pytest.fixture
+    def fetcher(self, monkeypatch):
+        big, small = f"{self.ROOT}/files/besar.pdf", f"{self.ROOT}/files/kecil.pdf"
+        _CountingFetcher.PAGES = {
+            f"{self.ROOT}/sitemap.xml": self.SITEMAP,
+            f"{self.ROOT}/dok/pmk-1": _page(
+                "PMK 1 - Tarif Bea Masuk",
+                links=f'<a href="{big}">Fulltext</a><a href="{small}">Lampiran</a>'
+                      f'<a href="{self.ROOT}/abstrak/1.pdf">Abstrak</a>'
+                      f'<a href="{self.ROOT}/files/terlalu-besar.pdf">Tabel</a>'
+                      f'<a href="{self.ROOT}/files/tanpa-ukuran.pdf">Lain</a>',
+            ),
+            f"{self.ROOT}/dok/pmk-2": _page("PMK 2 - Standar Biaya Masukan"),
+        }
+        _CountingFetcher.SIZES = {
+            big: 5_000_000, small: 40_000, f"{self.ROOT}/files/terlalu-besar.pdf": 900 * 1024 * 1024,
+        }
+        _CountingFetcher.requests = []
+        monkeypatch.setattr(crawler_module, "PoliteFetcher", _CountingFetcher)
+        return _CountingFetcher
+
+    def test_sitemap_entries_become_detail_pages(self, isolated_settings, guard, fetcher):
+        SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
+        fetched = [url for method, url in fetcher.requests if method == "GET"]
+        assert f"{self.ROOT}/dok/pmk-1" in fetched and f"{self.ROOT}/dok/pmk-2" in fetched
+        assert not any("elsewhere" in url or url.endswith("/tentang") for url in fetched)
+
+    def test_a_title_outside_the_scope_is_not_written(self, isolated_settings, guard, fetcher):
+        outcome = SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
+        written = [p.name for p in (Path(isolated_settings.source_directory) / "Regulasi" / "PMK").glob("*.txt")]
+        assert outcome.pages_out_of_scope == 1
+        assert len(written) == 1 and written[0].startswith("PMK 1")
+
+    def test_an_out_of_scope_page_is_not_fetched_again(self, isolated_settings, guard, fetcher):
+        SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
+        fetcher.requests.clear()
+        again = SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
+        assert ("GET", f"{self.ROOT}/dok/pmk-2") not in fetcher.requests
+        assert again.pages_out_of_scope == 1
+
+    def test_downloads_smallest_first_and_unknown_sizes_last(self, isolated_settings, guard, fetcher):
+        SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
+        downloads = [Path(url).name for method, url in fetcher.requests if method == "DOWNLOAD"]
+        assert downloads == ["kecil.pdf", "besar.pdf", "tanpa-ukuran.pdf"]
+
+    def test_never_downloads_a_file_over_the_limit_or_an_excluded_one(self, isolated_settings, guard, fetcher):
+        outcome = SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
+        downloaded = [url for method, url in fetcher.requests if method == "DOWNLOAD"]
+        assert outcome.attachments_too_large == 1
+        assert not any("terlalu-besar" in url or "/abstrak/" in url for url in downloaded)

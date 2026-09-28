@@ -70,6 +70,13 @@ class CrawlSection:
     sample_attachment_limit: int = 10
     #: Optional sections are crawled only when named explicitly.
     optional: bool = False
+    #: Regex a detail page's title must match to be kept. A page that fails it
+    #: is remembered as out of scope, so later crawls do not fetch it again.
+    title_pattern: str = ""
+    #: Download attachments smallest first, measured with a HEAD request, so
+    #: most documents arrive early and a file over the size limit is never
+    #: downloaded at all.
+    smallest_attachments_first: bool = False
 
 
 @dataclass(frozen=True)
@@ -107,6 +114,9 @@ class CrawlSite:
     attachment_hosts: frozenset[str] = frozenset()
     #: Path regexes marking download links that carry no file extension.
     attachment_path_patterns: tuple[str, ...] = ()
+    #: Path regexes of downloads never taken, such as an abstract published
+    #: beside the full text.
+    attachment_exclude_patterns: tuple[str, ...] = ()
     #: Query parameter a paginated listing takes, counted from 0.
     page_parameter: str = "page"
 
@@ -127,6 +137,7 @@ class SiteUrl:
         self._rewrites = [(re.compile(pattern), replacement)
                           for pattern, replacement in site.path_rewrites]
         self._attachment_paths = [re.compile(pattern) for pattern in site.attachment_path_patterns]
+        self._excluded_attachments = [re.compile(pattern) for pattern in site.attachment_exclude_patterns]
 
     def normalise(self, href: str, base_url: str) -> str | None:
         """Return an absolute, canonical URL on this site, or None.
@@ -166,6 +177,13 @@ class SiteUrl:
         path = urlparse(url).path
         return path.lower().endswith(self.ATTACHMENT_EXTENSIONS) or any(
             pattern.search(path) for pattern in self._attachment_paths
+        )
+
+    def is_wanted_attachment(self, url: str) -> bool:
+        """True when ``url`` is a document file the site's plan does not exclude."""
+        path = urlparse(url).path
+        return self.is_attachment(url) and not any(
+            pattern.search(path) for pattern in self._excluded_attachments
         )
 
     def with_page(self, url: str, page_number: int) -> str:
@@ -232,7 +250,7 @@ class PageParser:
             links = self._links_in(content, url)
         attachments = [
             (label, link) for label, link in self._labelled_links_in(content, url)
-            if self._urls.is_attachment(link)
+            if self._urls.is_wanted_attachment(link)
         ]
         return ParsedPage(
             title=title, text=self._readable_text(content), links=links, attachments=attachments
@@ -327,6 +345,19 @@ class PoliteFetcher:
         response.encoding = response.encoding or "utf-8"
         return response.text
 
+    def size_of(self, url: str) -> int | None:
+        """Return the size in bytes ``url`` declares, or None when it does not say.
+
+        One attempt only: the answer merely orders the downloads, and a file
+        whose size is unknown is still downloaded, just last.
+        """
+        try:
+            response = self._request(url, stream=False, method="HEAD", attempts=1)
+        except RuntimeError:
+            return None
+        length = response.headers.get("Content-Length", "")
+        return int(length) if length.isdigit() and int(length) > 0 else None
+
     def download(
         self, url: str, target_for: Callable[[str], Path], maximum_bytes: int
     ) -> tuple[Path, int]:
@@ -387,16 +418,18 @@ class PoliteFetcher:
             raise UnsupportedAttachment(content_type or "tipe tidak diketahui")
         return f"{Path(name).stem or 'lampiran'}{declared}"
 
-    def _request(self, url: str, stream: bool):
-        """Perform one GET with courtesy spacing and retries on transient errors."""
+    def _request(self, url: str, stream: bool, method: str = "GET", attempts: int | None = None):
+        """Perform one request with courtesy spacing and retries on transient errors."""
         import requests
 
+        attempts = attempts or self.RETRY_ATTEMPTS
         last_error: Exception | None = None
-        for attempt in range(1, self.RETRY_ATTEMPTS + 1):
+        for attempt in range(1, attempts + 1):
             self._wait_for_turn()
             try:
-                response = self._session.get(
-                    url, timeout=self._settings.crawl_timeout_seconds, stream=stream
+                response = self._session.request(
+                    method, url, timeout=self._settings.crawl_timeout_seconds,
+                    stream=stream, allow_redirects=True,
                 )
                 if response.status_code >= 500:
                     raise requests.HTTPError(f"HTTP {response.status_code}")
@@ -408,7 +441,8 @@ class PoliteFetcher:
                 if status is not None and status < 500:
                     break
                 LOGGER.info("Percobaan %d gagal untuk %s: %s", attempt, url, error)
-                time.sleep(5 * attempt)
+                if attempt < attempts:
+                    time.sleep(5 * attempt)
         raise RuntimeError(f"{type(last_error).__name__}: {last_error}")
 
     def _wait_for_turn(self) -> None:
@@ -524,7 +558,11 @@ class CrawlOutcome:
     #: Pages whose text is identical to one already written — one page
     #: reachable under two addresses.
     pages_duplicate: int = 0
+    #: Pages whose title falls outside the section's scope.
+    pages_out_of_scope: int = 0
     attachments_written: int = 0
+    #: Attachments whose declared size exceeds the limit, never downloaded.
+    attachments_too_large: int = 0
     failed: int = 0
     errors: list[str] = field(default_factory=list)
 
@@ -547,8 +585,19 @@ class CrawlManifest:
 
     def has_file_for(self, url: str) -> bool:
         """True when ``url`` was saved before and the file is still present."""
-        entry = self._entries.get(url)
-        return bool(entry) and (self._corpus / entry["file"]).exists()
+        entry = self._entries.get(url) or {}
+        return "file" in entry and (self._corpus / entry["file"]).exists()
+
+    def is_out_of_scope(self, url: str) -> bool:
+        """True when ``url`` was fetched before and judged outside the plan's scope."""
+        return "out_of_scope" in (self._entries.get(url) or {})
+
+    def record_out_of_scope(self, url: str, reason: str) -> None:
+        """Remember that ``url`` holds nothing the corpus wants, and why."""
+        self._entries[url] = {
+            "out_of_scope": reason,
+            "saved_at": datetime.now().isoformat(timespec="seconds"),
+        }
 
     def record(
         self, url: str, written: Path, attachments: list[tuple[str, str]] | None = None
@@ -634,6 +683,9 @@ class SiteCrawler:
                 attachments: dict[str, str] = {}
 
                 for index, page in enumerate(pages, start=1):
+                    if not refresh and manifest.is_out_of_scope(page.url):
+                        outcome.pages_out_of_scope += 1
+                        continue
                     if not refresh and manifest.has_file_for(page.url):
                         outcome.pages_unchanged += 1
                         for label, link in manifest.attachments_of(page.url):
@@ -641,26 +693,9 @@ class SiteCrawler:
                         continue
                     try:
                         parsed = parser.parse(fetcher.get_text(page.url), page.url)
-                        # Many FAQ entries are only a PDF, so attachments are
-                        # queued even when the page itself has too little text.
-                        for label, link in parsed.attachments:
-                            attachments.setdefault(link, label)
-                        fingerprint = hashlib.sha1(parsed.text.encode("utf-8")).hexdigest()
-                        if len(parsed.text) < self.MINIMUM_TEXT_CHARACTERS:
-                            outcome.pages_skipped += 1
-                            LOGGER.info("Dilewati (tanpa teks): %s", page.url)
-                        elif fingerprint in written_texts:
-                            # Recorded against the copy already written, so a
-                            # later crawl, which skips that copy, still knows
-                            # this address is covered and does not write it again.
-                            manifest.record(page.url, written_texts[fingerprint])
-                            outcome.pages_duplicate += 1
-                            LOGGER.info("Dilewati (isi sama dengan halaman lain): %s", page.url)
-                        else:
-                            written = writer.write_page(section, page, parsed)
-                            written_texts[fingerprint] = written
-                            manifest.record(page.url, written, parsed.attachments)
-                            outcome.pages_written += 1
+                        self._keep_page(
+                            section, page, parsed, writer, manifest, outcome, attachments, written_texts
+                        )
                     except Exception as error:
                         outcome.failed += 1
                         outcome.errors.append(f"{page.url}: {error}")
@@ -677,6 +712,46 @@ class SiteCrawler:
         finally:
             manifest.save()
         return outcome
+
+    def _keep_page(
+        self,
+        section: CrawlSection,
+        page: ExternalPage,
+        parsed: ParsedPage,
+        writer: CorpusPageWriter,
+        manifest: CrawlManifest,
+        outcome: CrawlOutcome,
+        attachments: dict[str, str],
+        written_texts: dict[str, Path],
+    ) -> None:
+        """Write one fetched page unless it is out of scope, empty, or a duplicate.
+
+        An in-scope page queues its attachments even when it has too little
+        text of its own, because many FAQ entries are only a PDF.
+        """
+        if section.title_pattern and not re.search(section.title_pattern, parsed.title, re.IGNORECASE):
+            manifest.record_out_of_scope(page.url, f"judul di luar cakupan: {parsed.title}")
+            outcome.pages_out_of_scope += 1
+            LOGGER.info("Di luar cakupan: %s (%s)", parsed.title, page.url)
+            return
+        for label, link in parsed.attachments:
+            attachments.setdefault(link, label)
+        fingerprint = hashlib.sha1(parsed.text.encode("utf-8")).hexdigest()
+        if len(parsed.text) < self.MINIMUM_TEXT_CHARACTERS:
+            outcome.pages_skipped += 1
+            LOGGER.info("Dilewati (tanpa teks): %s", page.url)
+        elif fingerprint in written_texts:
+            # Recorded against the copy already written, so a later crawl,
+            # which skips that copy, still knows this address is covered and
+            # does not write it again.
+            manifest.record(page.url, written_texts[fingerprint])
+            outcome.pages_duplicate += 1
+            LOGGER.info("Dilewati (isi sama dengan halaman lain): %s", page.url)
+        else:
+            written = writer.write_page(section, page, parsed)
+            written_texts[fingerprint] = written
+            manifest.record(page.url, written, parsed.attachments)
+            outcome.pages_written += 1
 
     def _select_sections(
         self, site: CrawlSite, section_names: list[str] | None
@@ -735,11 +810,12 @@ class SiteCrawler:
     ) -> list[str]:
         """Follow one listing page by page until ``limit`` or the last page."""
         found: list[str] = []
+        seen: set[str] = set()
         page_number = 0
         while limit is None or len(found) < limit:
             url = urls.with_page(listing_url, page_number) if paginate else listing_url
             try:
-                links = parser.parse(fetcher.get_text(url), url).links
+                links = self._listing_links(fetcher.get_text(url), url, parser, urls)
             except Exception as error:
                 LOGGER.warning("Gagal membaca daftar %s: %s", url, error)
                 break
@@ -748,17 +824,28 @@ class SiteCrawler:
                 link for link in links
                 if detail_pattern.match(urls.path_of(link))
                 and not urls.is_attachment(link)
-                and link not in found
+                and link not in seen
             ]
             # Detail links carry no query; a "?page=" link is the pager itself.
             new_links = [link for link in new_links if "?" not in link]
             if not new_links:
                 break
             found.extend(new_links)
+            seen.update(new_links)
             if not paginate:
                 break
             page_number += 1
         return found if limit is None else found[:limit]
+
+    @staticmethod
+    def _listing_links(text: str, url: str, parser: PageParser, urls: SiteUrl) -> list[str]:
+        """Return the links a listing offers: a sitemap's ``<loc>`` entries, or a page's anchors."""
+        if "<urlset" in text[:2000]:
+            locations = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", text)
+            return list(dict.fromkeys(
+                link for link in (urls.normalise(location, url) for location in locations) if link
+            ))
+        return parser.parse(text, url).links
 
     def _download_attachments(
         self,
@@ -772,17 +859,17 @@ class SiteCrawler:
         refresh: bool,
     ) -> None:
         """Download the attachments linked from a section's pages."""
-        links = list(attachments)
+        maximum_bytes = int(self._settings.crawl_attachment_maximum_megabytes * 1024 * 1024)
+        links = [link for link in attachments if refresh or not manifest.has_file_for(link)]
+        if section.smallest_attachments_first:
+            links = self._smallest_first(links, fetcher, maximum_bytes, outcome)
         if not full:
             limit = section.sample_attachment_limit
             if self._page_limit is not None:
                 limit = min(limit, self._page_limit)
             links = links[:limit]
-        maximum_bytes = int(self._settings.crawl_attachment_maximum_megabytes * 1024 * 1024)
 
         for link in links:
-            if not refresh and manifest.has_file_for(link):
-                continue
             try:
                 target, size = fetcher.download(
                     link, lambda name, url=link: writer.attachment_target(section, url, name),
@@ -797,6 +884,35 @@ class SiteCrawler:
                 outcome.failed += 1
                 outcome.errors.append(f"{link}: {error}")
                 LOGGER.warning("Gagal mengunduh %s: %s", link, error)
+
+    def _smallest_first(
+        self, links: list[str], fetcher: PoliteFetcher, maximum_bytes: int, outcome: CrawlOutcome
+    ) -> list[str]:
+        """Order ``links`` by declared size, smallest first, dropping those over the limit.
+
+        A link whose server declares no size goes last rather than being
+        dropped; its download still enforces the limit.
+        """
+        LOGGER.info("Mengukur %d lampiran sebelum diunduh...", len(links))
+        sizes: dict[str, int | None] = {}
+        for index, link in enumerate(links, start=1):
+            sizes[link] = fetcher.size_of(link)
+            if index % 50 == 0:
+                LOGGER.info("Terukur %d/%d lampiran", index, len(links))
+        kept = []
+        for link in links:
+            size = sizes[link]
+            if size is not None and size > maximum_bytes:
+                outcome.attachments_too_large += 1
+                LOGGER.info("Lampiran dilewati (%d MB, di atas batas): %s", size // (1024 * 1024), link)
+            else:
+                kept.append(link)
+        known = [sizes[link] for link in kept if sizes[link] is not None]
+        LOGGER.info(
+            "Akan diunduh %d lampiran, total terukur %.0f MB, terkecil lebih dulu",
+            len(kept), sum(known) / (1024 * 1024),
+        )
+        return sorted(kept, key=lambda link: (sizes[link] is None, sizes[link] or 0))
 
 
 #: Shared crawler bound to the process-wide settings and guard.

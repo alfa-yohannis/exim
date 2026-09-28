@@ -86,3 +86,10 @@ $RECYCLE.BIN/
 *.synctex.gz
 *.fls
 *.fdb_latexmk
+*.xdv
+*.nav
+*.snm
+*.toc
+
+
+corpus-pajak

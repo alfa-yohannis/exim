@@ -125,6 +125,71 @@ BEA_CUKAI = CrawlSite(
     ),
 )
 
+# --- JDIH Kemenkeu ---------------------------------------------------------------
+
+_JDIH_KEMENKEU_ROOT = "https://jdih.kemenkeu.go.id"
+_JDIH_KEMENKEU_SITEMAP = f"{_JDIH_KEMENKEU_ROOT}/sitemap.xml"
+
+#: Title words marking a Ministry of Finance regulation as customs or trade
+#: law. The unit code in "190/PMK.04/2022" says who issued a regulation until
+#: 2022: .04 is Bea Cukai, all of it wanted; .010 and .011 are the fiscal
+#: policy agency, whose import tariffs sit beside tax and budget rules. Since
+#: 2023 regulations are numbered "PMK 96 Tahun 2023", with no unit at all, so
+#: those and BKF's are kept by their title.
+_CUSTOMS_TITLE = (
+    r"kepabeanan|pabean|bea masuk|bea keluar|impor|ekspor|barang kiriman|"
+    r"penimbunan berikat|kawasan berikat|perdagangan bebas|pelabuhan bebas|"
+    r"kawasan ekonomi khusus|preferensi|anti ?dumping|tindakan pengamanan|"
+    r"keasalan|surat keterangan asal|manifes|klasifikasi barang"
+)
+
+#: jdih.kemenkeu.go.id lists every regulation in its sitemap as
+#: "/dok/190-pmk-04-2022" (until 2022) or "/dok/pmk-96-tahun-2023" (since).
+#: A document page holds the metadata — status, dates, subject, and the
+#: history of what it revokes or amends — and links the full text as a PDF,
+#: beside an abstract that repeats it and is left out.
+JDIH_KEMENKEU = CrawlSite(
+    key="jdih-kemenkeu",
+    folder="JDIH Kemenkeu",
+    root=_JDIH_KEMENKEU_ROOT,
+    hosts=frozenset({"jdih.kemenkeu.go.id"}),
+    disallowed_prefixes=("/api/auth", "/api/health", "/pdfjs"),
+    content_selectors=("body",),
+    furniture_selectors=(
+        "header.jdih-header", "footer.jdih-footer", ".copyright-area", ".jdih-breadcrumb",
+        "ul.nav", '.accordion-item:-soup-contains("Kutip Dokumen Ini")',
+    ),
+    title_suffix=r"\s*\|\s*JDIH Kementerian Keuangan\s*$",
+    # Old documents keep the abstract under /api/download/abtrak/; newer ones
+    # name the file itself "ABSTRAK PMK 12.pdf".
+    attachment_exclude_patterns=(r"^/api/download/abtrak/", r"(?i)abstrak"),
+    sections=(
+        CrawlSection(
+            folder="PMK Bea Cukai",
+            listing_urls=(_JDIH_KEMENKEU_SITEMAP,),
+            detail_pattern=r"^/dok/\d+-pmk-04-\d{4}$",
+            paginate=False,
+            smallest_attachments_first=True,
+        ),
+        CrawlSection(
+            folder="PMK Kebijakan Fiskal",
+            listing_urls=(_JDIH_KEMENKEU_SITEMAP,),
+            detail_pattern=r"^/dok/\d+-pmk-01[01]-\d{4}$",
+            paginate=False,
+            title_pattern=_CUSTOMS_TITLE,
+            smallest_attachments_first=True,
+        ),
+        CrawlSection(
+            folder="PMK Sejak 2023",
+            listing_urls=(_JDIH_KEMENKEU_SITEMAP,),
+            detail_pattern=r"^/dok/pmk-\d+-tahun-\d{4}$",
+            paginate=False,
+            title_pattern=_CUSTOMS_TITLE,
+            smallest_attachments_first=True,
+        ),
+    ),
+)
+
 # --- pajak.go.id (reference; its corpus already exists in corpus-pajak) --------
 
 _PAJAK_ROOT = "https://www.pajak.go.id"
@@ -203,4 +268,4 @@ PAJAK = CrawlSite(
 )
 
 #: Every crawlable site, by its command-line key, in order of influence.
-SITES: dict[str, CrawlSite] = {site.key: site for site in (BEA_CUKAI, PAJAK)}
+SITES: dict[str, CrawlSite] = {site.key: site for site in (BEA_CUKAI, JDIH_KEMENKEU, PAJAK)}

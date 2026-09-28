@@ -84,7 +84,7 @@ class CommandLineInterface:
         crawl_parser.add_argument(
             "--site",
             default="beacukai",
-            help="Situs yang diambil (bawaan: beacukai). Pilihan: beacukai, pajak",
+            help="Situs yang diambil (bawaan: beacukai). Pilihan: beacukai, jdih-kemenkeu, pajak",
         )
         crawl_parser.add_argument(
             "--full",
@@ -169,7 +169,9 @@ class CommandLineInterface:
         print(f"  Sudah ada        : {outcome.pages_unchanged}")
         print(f"  Tanpa teks       : {outcome.pages_skipped}")
         print(f"  Isi kembar       : {outcome.pages_duplicate}")
+        print(f"  Di luar cakupan  : {outcome.pages_out_of_scope}")
         print(f"  Lampiran diunduh : {outcome.attachments_written}")
+        print(f"  Lampiran terlalu besar (dilewati): {outcome.attachments_too_large}")
         print(f"  Gagal            : {outcome.failed}")
         for message in outcome.errors[:30]:
             print(f"    - {message}")

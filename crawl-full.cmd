@@ -18,7 +18,7 @@ set PYTHONIOENCODING=utf-8
 set PYTHONUNBUFFERED=1
 set LOG=data\crawl.log
 
-for %%S in (beacukai) do (
+for %%S in (beacukai jdih-kemenkeu) do (
     echo ===== !date! !time!  %%S pass 1 ===== >> %LOG%
     .venv\Scripts\python.exe main.py crawl --site %%S --full --no-ingest >> %LOG% 2>&1
     echo ===== !date! !time!  %%S pass 2 ===== >> %LOG%

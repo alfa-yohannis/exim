@@ -32,8 +32,15 @@ berkas dan halaman sumbernya.
 ## Sumber yang di-crawl
 
 Diurutkan menurut **pengaruh**: seberapa kuat dasar hukumnya dan seberapa
-banyak pertanyaan ekspor-impor yang lazim dapat dijawab darinya. Crawl dimulai
-dari atas; sumber di bawah hanya menambah cakupan per komoditas.
+banyak pertanyaan ekspor-impor yang lazim dapat dijawab darinya; sumber di
+bawah menambah cakupan per komoditas. Urutan pengunduhan berbeda: setelah Bea
+Cukai dan JDIH Kemenkeu, pengunduhan dimulai dari sumber dengan perkiraan
+berkas paling sedikit.
+
+Kolom **Perkiraan berkas** menghitung halaman dan lampiran yang akan diambil,
+bukan seluruh situs; berita tidak dihitung. Angka tanpa tanda berasal dari hasil
+crawl, sitemap, atau sampel. Yang bertanda *(kasar)* masih tebakan dari
+struktur situs dan diperbarui saat situsnya dipetakan.
 
 Kolom **Cara** menentukan pembacanya. **HTTP** berarti halaman dapat diambil
 langsung. **Chrome** berarti isinya baru muncul setelah JavaScript berjalan,
@@ -43,43 +50,44 @@ berjalan, karena porta debug tidak dapat dipakai bersamaan.
 
 URL dan robots.txt diperiksa pada 28 September 2026. Crawler-nya
 `app/crawler.py`, dengan rencana per situs di `app/crawl_sites.py`. Bea Cukai
-(`--site beacukai`) sudah di-crawl; situs lain menyusul sesuai urutan di bawah.
+(`--site beacukai`) sudah di-crawl, dan JDIH Kemenkeu (`--site jdih-kemenkeu`)
+sedang diunduh; situs lain menyusul.
 Hasilnya masuk ke `corpus-exim\<Situs>\<Bagian>\`, sehingga filter folder di
 antarmuka menjadi filter per sumber. Lihat
 [Berjalan di latar belakang](#berjalan-di-latar-belakang).
 
 ### Tier 1 — Inti
 
-| # | Situs | Titik awal | Yang diambil | Cara |
-|---|---|---|---|---|
-| 1 | Bea Cukai | https://www.beacukai.go.id/peta-situs | Prosedur ekspor dan impor, larangan dan pembatasan, BTKI dan tarif, FAQ, barang kiriman dan penumpang, fasilitas (KITE, Kawasan Berikat, AEO, MITA), FTZ, KEK, keberatan dan banding. Halaman: `/impor-untuk-dipakai`, `/klinik-ekspor`, `/larangan-pembatasan`, `/btki-dan-tarif`, `/faq`, `/barangkiriman`, `/barang-penumpang`, `/registrasi-kepabeanan`, `/pemeriksaan-pabean`, `/impor-sementara`, `/keberatan-banding`, `/fasilitas-kite`, `/fasilitas-tempat-penimbunan-berikat`, `/fasilitas-aeo`, `/fasilitas-mita`, `/fta`, `/free-trade-zone`, `/kawasan-ekonomi-khusus` | HTTP |
-| 2 | INSW — Indonesia National Trade Repository | https://insw.go.id/intr | Per pos tarif (HS): tarif bea masuk dan keluar, ketentuan lartas, instansi penerbit izin. Jenis pertanyaan yang paling sering muncul: "HS sekian kena apa saja?" | Chrome |
-| 3 | JDIH Kemenkeu | https://jdih.kemenkeu.go.id/search?bentuk=Peraturan+Menteri · `/sitemap.xml` · `/feed.json` | Teks lengkap PMK: tata laksana kepabeanan, penetapan BTKI dan tarif bea masuk, tarif preferensi FTA, PPh 22 dan PPN impor. Hindari `/pdfjs` dan `/api/auth` (robots.txt) | HTTP |
-| 4 | JDIH BPK | https://peraturan.bpk.go.id/Search?keywords=kepabeanan · `/sitemap.xml` | UU Kepabeanan (10/1995 jo. 17/2006), UU Perdagangan (7/2014), PP 29/2021, PP DHE (36/2023), serta Permendag kebijakan ekspor dan impor — pengganti jdih.kemendag.go.id yang menolak crawler AI | HTTP |
-| 5 | Kemendag — Informasi Mekanisme Ekspor Impor | https://exim.kemendag.go.id | Mekanisme ekspor-impor per komoditas, persyaratan perizinan, ketentuan asal barang | Chrome |
-| 6 | Ditjen Perdagangan Luar Negeri | https://ditjendaglu.kemendag.go.id/faq · `/publikasi` · `/infografis` · `/sitemap.xml` | FAQ kebijakan dan perizinan ekspor-impor, ketentuan asal barang, publikasi. Hanya HTML: robots.txt melarang PDF, ZIP, DOCX, dan PPTX | HTTP |
+| # | Situs | Titik awal | Yang diambil | Perkiraan berkas | Cara |
+|---|---|---|---|---|---|
+| 1 | Bea Cukai | https://www.beacukai.go.id/peta-situs | Prosedur ekspor dan impor, larangan dan pembatasan, BTKI dan tarif, FAQ, barang kiriman dan penumpang, fasilitas (KITE, Kawasan Berikat, AEO, MITA), FTZ, KEK, keberatan dan banding. Halaman: `/impor-untuk-dipakai`, `/klinik-ekspor`, `/larangan-pembatasan`, `/btki-dan-tarif`, `/faq`, `/barangkiriman`, `/barang-penumpang`, `/registrasi-kepabeanan`, `/pemeriksaan-pabean`, `/impor-sementara`, `/keberatan-banding`, `/fasilitas-kite`, `/fasilitas-tempat-penimbunan-berikat`, `/fasilitas-aeo`, `/fasilitas-mita`, `/fta`, `/free-trade-zone`, `/kawasan-ekonomi-khusus` | ±460 — sudah (97 halaman + 359 lampiran) | HTTP |
+| 2 | INSW — Indonesia National Trade Repository | https://insw.go.id/intr | Per pos tarif (HS): tarif bea masuk dan keluar, ketentuan lartas, instansi penerbit izin. Jenis pertanyaan yang paling sering muncul: "HS sekian kena apa saja?" | ±11.000 pos tarif HS | Chrome |
+| 3 | JDIH Kemenkeu | https://jdih.kemenkeu.go.id/sitemap.xml | PMK.04 (Bea Cukai) seluruhnya; PMK.010/.011 (BKF) dan PMK sejak 2023 hanya yang judulnya menyangkut kepabeanan atau perdagangan. Tiap PMK: halaman metadata (status, riwayat pencabutan dan perubahan) dan PDF teks lengkap, diunduh dari yang terkecil, tanpa abstrak. Hindari `/pdfjs` dan `/api/auth` (robots.txt) | ±870 PMK + PDF, ±5 GB — sedang diunduh | HTTP |
+| 4 | JDIH BPK | https://peraturan.bpk.go.id/Search?keywords=kepabeanan · `/sitemap.xml` | UU Kepabeanan (10/1995 jo. 17/2006), UU Perdagangan (7/2014), PP 29/2021, PP DHE (36/2023), serta Permendag kebijakan ekspor dan impor — pengganti jdih.kemendag.go.id yang menolak crawler AI | ±150 peraturan + PDF | HTTP |
+| 5 | Kemendag — Informasi Mekanisme Ekspor Impor | https://exim.kemendag.go.id | Mekanisme ekspor-impor per komoditas, persyaratan perizinan, ketentuan asal barang | ±300 *(kasar)* | Chrome |
+| 6 | Ditjen Perdagangan Luar Negeri | https://ditjendaglu.kemendag.go.id/faq · `/publikasi` · `/infografis` · `/sitemap.xml` | FAQ kebijakan dan perizinan ekspor-impor, ketentuan asal barang, publikasi. Hanya HTML: robots.txt melarang PDF, ZIP, DOCX, dan PPTX | ±20 halaman | HTTP |
 
 ### Tier 2 — Lartas dan perizinan sektoral
 
-| # | Situs | Titik awal | Yang diambil | Cara |
-|---|---|---|---|---|
-| 7 | Badan Karantina Indonesia | https://karantinaindonesia.go.id/sitemap.xml · https://jdih.karantinaindonesia.go.id | Persyaratan karantina hewan, ikan, dan tumbuhan untuk ekspor dan impor. Halaman `/tanya-karantina` dirender JavaScript | HTTP, Chrome untuk Tanya Karantina |
-| 8 | BPOM | https://www.pom.go.id/layanan · https://jdih.pom.go.id | Surat Keterangan Impor (SKI) pangan olahan, obat, kosmetik, suplemen | HTTP |
-| 9 | BSN | https://www.bsn.go.id | Daftar SNI wajib dan penilaian kesesuaian | HTTP |
-| 10 | Kemenperin | https://jdih.kemenperin.go.id · https://kemenperin.go.id | Pertimbangan teknis impor, pemberlakuan SNI wajib | HTTP |
-| 11 | Kementan | https://jdih.pertanian.go.id | RIPH dan rekomendasi impor produk pertanian | HTTP |
-| 12 | KKP · ESDM | https://kkp.go.id · https://www.esdm.go.id | Ekspor dan impor hasil perikanan; ekspor mineral dan batubara | HTTP |
+| # | Situs | Titik awal | Yang diambil | Perkiraan berkas | Cara |
+|---|---|---|---|---|---|
+| 7 | Badan Karantina Indonesia | https://karantinaindonesia.go.id/sitemap.xml · https://jdih.karantinaindonesia.go.id | Persyaratan karantina hewan, ikan, dan tumbuhan untuk ekspor dan impor. Halaman `/tanya-karantina` dirender JavaScript | ±100 *(kasar)* | HTTP, Chrome untuk Tanya Karantina |
+| 8 | BPOM | https://www.pom.go.id/layanan · https://jdih.pom.go.id | Surat Keterangan Impor (SKI) pangan olahan, obat, kosmetik, suplemen | ±50 *(kasar)* | HTTP |
+| 9 | BSN | https://www.bsn.go.id | Daftar SNI wajib dan penilaian kesesuaian | ±30 *(kasar)* | HTTP |
+| 10 | Kemenperin | https://jdih.kemenperin.go.id · https://kemenperin.go.id | Pertimbangan teknis impor, pemberlakuan SNI wajib | ±150 *(kasar)* | HTTP |
+| 11 | Kementan | https://jdih.pertanian.go.id | RIPH dan rekomendasi impor produk pertanian | ±50 *(kasar)* | HTTP |
+| 12 | KKP · ESDM | https://kkp.go.id · https://www.esdm.go.id | Ekspor dan impor hasil perikanan; ekspor mineral dan batubara | ±60 *(kasar)* | HTTP |
 
 ### Tier 3 — Perjanjian dagang, devisa, pembiayaan
 
-| # | Situs | Titik awal | Yang diambil | Cara |
-|---|---|---|---|---|
-| 13 | Ditjen Perundingan Perdagangan Internasional | https://ditjenppi.kemendag.go.id | Daftar dan isi perjanjian dagang (FTA, CEPA) | HTTP |
-| 14 | e-SKA Kemendag | https://e-ska.kemendag.go.id/cms.php | Informasi Surat Keterangan Asal (SKA) — bagian publik saja | HTTP |
-| 15 | Ditjen Pengembangan Ekspor Nasional | https://ditjenpen.kemendag.go.id | Program pengembangan ekspor dan informasi pasar | HTTP |
-| 16 | Bank Indonesia | https://www.bi.go.id/id | Ketentuan devisa hasil ekspor (DHE) dan pelaporannya. Halaman spesifiknya belum dipetakan | HTTP |
-| 17 | LPEI (Indonesia Eximbank) | https://www.indonesiaeximbank.go.id | Pembiayaan, penjaminan, dan asuransi ekspor | HTTP |
-| 18 | Salinan pajak.go.id | `D:\ALFA\djp\corpus-pajak` (proyek djp) | PPN impor, PPh 22 impor, fasilitas pajak Kawasan Berikat dan KITE — cukup disaring, tidak perlu crawl ulang | — |
+| # | Situs | Titik awal | Yang diambil | Perkiraan berkas | Cara |
+|---|---|---|---|---|---|
+| 13 | Ditjen Perundingan Perdagangan Internasional | https://ditjenppi.kemendag.go.id | Daftar dan isi perjanjian dagang (FTA, CEPA) | ±20 halaman | HTTP |
+| 14 | e-SKA Kemendag | https://e-ska.kemendag.go.id/cms.php | Informasi Surat Keterangan Asal (SKA) — bagian publik saja | ±10 *(kasar)* | HTTP |
+| 15 | Ditjen Pengembangan Ekspor Nasional | https://ditjenpen.kemendag.go.id | Program pengembangan ekspor dan informasi pasar | ±15 halaman | HTTP |
+| 16 | Bank Indonesia | https://www.bi.go.id/id | Ketentuan devisa hasil ekspor (DHE) dan pelaporannya. Halaman spesifiknya belum dipetakan | ±15 *(kasar)* | HTTP |
+| 17 | LPEI (Indonesia Eximbank) | https://www.indonesiaeximbank.go.id | Pembiayaan, penjaminan, dan asuransi ekspor | ±30 halaman | HTTP |
+| 18 | Salinan pajak.go.id | `D:\ALFA\djp\corpus-pajak` (proyek djp) | PPN impor, PPh 22 impor, fasilitas pajak Kawasan Berikat dan KITE — cukup disaring, tidak perlu crawl ulang | ±100 dari 10.250 berkas *(kasar)* | — |
 
 ### Tidak di-crawl
 
