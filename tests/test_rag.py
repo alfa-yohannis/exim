@@ -126,7 +126,14 @@ class TestPromptBuilder:
         assert "HANYA berdasarkan KONTEKS" in prompt
 
     def test_system_prompt_requires_citations(self, isolated_settings):
-        assert "[n]" in PromptBuilder(isolated_settings).build_system_prompt()
+        assert "[1][3]" in PromptBuilder(isolated_settings).build_system_prompt()
+
+    def test_prompts_show_no_citation_placeholder(self, isolated_settings):
+        """Shown "[n]", the model copied it into its answer as "[n2]"."""
+        builder = PromptBuilder(isolated_settings)
+        user_prompt = builder.build_user_prompt("Berapa EWMP?", [build_passage(1)])
+        assert "[n" not in builder.build_system_prompt()
+        assert "[n" not in user_prompt
 
     def test_system_prompt_demands_verbatim_identifiers(self, isolated_settings):
         """Decree numbers and figures are audited; paraphrasing them is a defect."""
@@ -166,6 +173,23 @@ class TestPromptBuilder:
     def test_empty_context_still_produces_a_valid_prompt(self, isolated_settings):
         prompt = PromptBuilder(isolated_settings).build_user_prompt("Pertanyaan?", [])
         assert "PERTANYAAN" in prompt
+
+    @pytest.mark.parametrize(
+        ("language", "named", "instruction"),
+        [
+            ("id", "Bahasa Indonesia", "Jawab dalam Bahasa Indonesia."),
+            ("en", "bahasa Inggris (English)", "Answer in English."),
+            ("vi", "bahasa Vietnam (Tiếng Việt)", "Trả lời bằng tiếng Việt."),
+        ],
+    )
+    def test_answer_language_follows_the_interface(self, isolated_settings, language, named, instruction):
+        builder = PromptBuilder(isolated_settings)
+        assert f"dalam {named} yang formal" in builder.build_system_prompt(language)
+        assert builder.build_user_prompt("Pertanyaan?", [], language=language).endswith(instruction)
+
+    def test_an_unknown_language_falls_back_to_indonesian(self, isolated_settings):
+        prompt = PromptBuilder(isolated_settings).build_system_prompt("fr")
+        assert "dalam Bahasa Indonesia yang formal" in prompt
 
 
 class TestAnswerStreamOrdering:
@@ -222,6 +246,71 @@ class TestAnswerStreamOrdering:
         assert "HANYA berdasarkan KONTEKS" in engine.stub_backend.received_system_prompt
 
 
+class _StubRewriter:
+    """Restates every question for Vietnam, and no other country."""
+
+    RESTATED = "Quy định nhập khẩu cà phê vào Việt Nam"
+
+    def supports(self, country):
+        return country == "Vietnam"
+
+    def rewrite(self, question, country):
+        return self.RESTATED
+
+
+class TestCountryRules:
+    """A question about one country's rules, chosen under "Aturan negara"."""
+
+    QUESTION = "Syarat ekspor kopi ke Vietnam?"
+
+    @pytest.fixture
+    def engine(self, isolated_settings):
+        backend = StubBackend(isolated_settings)
+        retriever = StubRetriever([build_passage(1)])
+        engine = RagEngine(
+            isolated_settings, retriever, StubFactory(backend), query_rewriter=_StubRewriter()
+        )
+        engine.stub_backend = backend
+        engine.stub_retriever = retriever
+        return engine
+
+    def test_the_restated_question_is_searched_in_that_country(self, engine):
+        collect_events(engine, QuestionRequest(self.QUESTION, folder_filter="Vietnam"))
+        assert engine.stub_retriever.received_question == _StubRewriter.RESTATED
+        assert engine.stub_retriever.received_folder_filter == "Vietnam"
+
+    def test_the_reader_is_shown_what_was_searched(self, engine):
+        events = collect_events(
+            engine, QuestionRequest(self.QUESTION, folder_filter="Vietnam", language="en")
+        )
+        status = next(event for event in events if event.name == "status")
+        sources = next(event for event in events if event.name == "sources")
+        assert status.payload["message"] == "Preparing the search in Vietnam's rules..."
+        assert sources.payload["search_query"] == _StubRewriter.RESTATED
+        assert sources.payload["country"] == "Vietnam"
+
+    def test_the_answer_keeps_to_that_country_and_the_question_as_asked(self, engine):
+        collect_events(engine, QuestionRequest(self.QUESTION, folder_filter="Vietnam"))
+        prompt = engine.stub_backend.received_user_prompt
+        assert "Jawab hanya tentang ketentuan Vietnam" in prompt
+        assert self.QUESTION in prompt
+
+    def test_the_answer_is_told_which_side_of_the_trade_applies(self, engine):
+        collect_events(engine, QuestionRequest(self.QUESTION, folder_filter="Vietnam"))
+        assert "ketentuan impor Vietnam" in engine.stub_backend.received_user_prompt
+
+    def test_without_a_country_the_question_is_searched_as_typed(self, engine):
+        events = collect_events(engine, QuestionRequest("Berapa EWMP?"))
+        assert engine.stub_retriever.received_question == "Berapa EWMP?"
+        sources = next(event for event in events if event.name == "sources")
+        assert "search_query" not in sources.payload
+
+    def test_country_names_follow_the_reader(self, isolated_settings):
+        builder = PromptBuilder(isolated_settings)
+        assert builder.country_name("Vietnam", "vi") == "Việt Nam"
+        assert builder.country_name("Vietnam", "en") == "Vietnam"
+
+
 class TestCitationContent:
     """What the evidence cards carry."""
 
@@ -272,6 +361,27 @@ class TestGroundingBehaviour:
         )
         events = collect_events(engine, QuestionRequest("Pertanyaan tanpa jawaban"))
         assert "tidak ditemukan" in joined_text(events).lower()
+
+    @pytest.mark.parametrize(
+        ("language", "phrase"),
+        [("en", "not found in the indexed documents"), ("vi", "Không tìm thấy thông tin")],
+    )
+    def test_not_found_message_follows_the_language(self, isolated_settings, language, phrase):
+        engine = RagEngine(
+            isolated_settings, StubRetriever([]), StubFactory(StubBackend(isolated_settings))
+        )
+        events = collect_events(engine, QuestionRequest("Question?", language=language))
+        assert phrase in joined_text(events)
+
+    def test_status_line_follows_the_language(self, isolated_settings):
+        engine = RagEngine(
+            isolated_settings,
+            StubRetriever([build_passage(1)]),
+            StubFactory(StubBackend(isolated_settings)),
+        )
+        events = collect_events(engine, QuestionRequest("Question?", language="en"))
+        status = next(event for event in events if event.name == "status")
+        assert status.payload["message"].startswith("Writing the answer with stub")
 
     def test_no_results_still_terminates_the_stream(self, isolated_settings):
         engine = RagEngine(

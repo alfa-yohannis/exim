@@ -22,7 +22,8 @@
      TabController          top-level navigation
      Application            composes the above and wires global events
 
-   The interface is written in Indonesian to match the corpus and its readers.
+   Text comes from i18n.js, loaded first, in the language the reader chose.
+   The same language goes with every question, so the answer matches it.
    ========================================================================== */
 
 'use strict';
@@ -44,9 +45,9 @@ class HtmlEscaper {
 
 /** Formats numbers and durations the way the sidebar displays them. */
 class ValueFormatter {
-  /** Groups thousands using Indonesian conventions. */
+  /** Groups thousands the way the interface language does. */
   count(value) {
-    return Number(value ?? 0).toLocaleString('id-ID');
+    return Number(value ?? 0).toLocaleString(interfaceLanguage.locale);
   }
 
   /** Renders a duration in seconds as a compact "1m 24s" style string. */
@@ -68,7 +69,7 @@ class ValueFormatter {
     ];
     for (const unit of units) {
       if (value >= unit.limit) {
-        return `${(value / unit.limit).toLocaleString('id-ID', { maximumFractionDigits: 1 })} ${unit.suffix}`;
+        return `${(value / unit.limit).toLocaleString(interfaceLanguage.locale, { maximumFractionDigits: 1 })} ${unit.suffix}`;
       }
     }
     return `${value} B`;
@@ -76,10 +77,10 @@ class ValueFormatter {
 
   /** Renders an ISO timestamp as a readable local date and time. */
   timestamp(isoText) {
-    if (!isoText) return 'belum pernah';
+    if (!isoText) return t('app.never');
     const parsed = new Date(isoText);
     if (Number.isNaN(parsed.getTime())) return isoText;
-    return parsed.toLocaleString('id-ID', {
+    return parsed.toLocaleString(interfaceLanguage.locale, {
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
@@ -125,7 +126,13 @@ class MarkdownRenderer {
 }
 
 /**
- * Turns "[n]" references in a rendered answer into clickable citation chips.
+ * Turns source references in a rendered answer into clickable citation chips.
+ *
+ * The model is asked for "[2]" and "[1][3]" but does not always comply: on
+ * 30 September 2026 it wrote "[n2]", copying a placeholder from its prompt.
+ * So references are read loosely — "[2]", "[n2]", "[Sumber 2]", "[1, 3]",
+ * "[1-3]", "【2】" — and every number in one becomes a chip of its own. That
+ * also mends answers already saved in a conversation.
  *
  * Works on the DOM after rendering rather than on the HTML string, so a "[1]"
  * appearing inside a code block, a link label or an attribute is left alone —
@@ -135,7 +142,19 @@ class CitationLinker {
   /** Elements whose text must never be rewritten into citation chips. */
   static PROTECTED_SELECTOR = 'code, pre, a';
 
-  /** Replaces every "[n]" in `rootElement` with a chip bound to `onClick`. */
+  /**
+   * One reference in brackets: numbers of one or two digits, joined by
+   * commas, semicolons or a dash, each optionally after a word for "source".
+   */
+  static REFERENCE = new RegExp(
+    '[\\[【]((?:(?:n|no\\.?|sumber|source|nguồn)\\s*)?\\d{1,2}' +
+    '(?:\\s*[,;–-]\\s*(?:(?:n|no\\.?|sumber|source|nguồn)\\s*)?\\d{1,2})*)[\\]】]',
+    'giu');
+
+  /** Longest range spelled out, so a stray "[1-99]" cannot flood the answer. */
+  static MAX_RANGE = 10;
+
+  /** Replaces every reference in `rootElement` with chips bound to `onClick`. */
   apply(rootElement, onClick) {
     const walker = document.createTreeWalker(rootElement, NodeFilter.SHOW_TEXT);
     const candidates = [];
@@ -144,28 +163,47 @@ class CitationLinker {
       const node = walker.currentNode;
       const parent = node.parentElement;
       if (!parent || parent.closest(CitationLinker.PROTECTED_SELECTOR)) continue;
-      if (/\[\d{1,2}\]/.test(node.nodeValue)) candidates.push(node);
+      const references = [...node.nodeValue.matchAll(CitationLinker.REFERENCE)];
+      if (references.length > 0) candidates.push([node, references]);
     }
 
     // Collected first, then replaced: mutating during the walk invalidates it.
-    for (const node of candidates) {
-      this.#replaceTextNode(node, onClick);
+    for (const [node, references] of candidates) {
+      this.#replaceTextNode(node, references, onClick);
     }
   }
 
   /** Splits one text node into plain text and citation-chip elements. */
-  #replaceTextNode(node, onClick) {
+  #replaceTextNode(node, references, onClick) {
+    const text = node.nodeValue;
     const fragment = document.createDocumentFragment();
-    for (const part of node.nodeValue.split(/(\[\d{1,2}\])/)) {
-      if (!part) continue;
-      const citationMatch = part.match(/^\[(\d{1,2})\]$/);
-      if (citationMatch) {
-        fragment.appendChild(this.#buildChip(citationMatch[1], onClick));
+    let position = 0;
+    for (const reference of references) {
+      if (reference.index > position) {
+        fragment.appendChild(document.createTextNode(text.slice(position, reference.index)));
+      }
+      for (const citationNumber of this.#numbersIn(reference[1])) {
+        fragment.appendChild(this.#buildChip(citationNumber, onClick));
+      }
+      position = reference.index + reference[0].length;
+    }
+    if (position < text.length) fragment.appendChild(document.createTextNode(text.slice(position)));
+    node.parentNode.replaceChild(fragment, node);
+  }
+
+  /** The source numbers one reference names, with "1-3" spelled out as 1, 2, 3. */
+  #numbersIn(reference) {
+    const numbers = [];
+    for (const piece of reference.split(/[,;]/)) {
+      const found = piece.match(/\d{1,2}/g).map(Number);
+      const [first, last] = found;
+      if (found.length === 2 && last > first && last - first < CitationLinker.MAX_RANGE) {
+        for (let number = first; number <= last; number += 1) numbers.push(String(number));
       } else {
-        fragment.appendChild(document.createTextNode(part));
+        numbers.push(...found.map(String));
       }
     }
-    node.parentNode.replaceChild(fragment, node);
+    return numbers;
   }
 
   /** Builds one citation chip element. */
@@ -213,7 +251,7 @@ class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ force_full_rebuild: forceFullRebuild }),
     });
-    if (response.status === 409) return { started: false, message: 'Proses indexing sedang berjalan.' };
+    if (response.status === 409) return { started: false, message: t('app.ingestRunning') };
     return this.#readJson(response);
   }
 
@@ -274,7 +312,7 @@ class ApiClient {
   #requireStream(response) {
     if (response.status === 401) SessionGuard.redirectToSignIn();
     if (!response.ok) {
-      const error = new Error(`Server menolak permintaan (HTTP ${response.status})`);
+      const error = new Error(t('app.requestRefused', { status: response.status }));
       error.status = response.status;
       throw error;
     }
@@ -551,7 +589,7 @@ class ReconnectPause {
     window.removeEventListener('online', this.handleOnline);
     this.abortSignal.removeEventListener('abort', this.handleAbort);
     if (shouldRetry) this.resolvePause();
-    else this.rejectPause(new DOMException('Dihentikan oleh pengguna.', 'AbortError'));
+    else this.rejectPause(new DOMException(t('app.stoppedByUser'), 'AbortError'));
   }
 }
 
@@ -601,7 +639,7 @@ class AnswerStreamFollower {
       if (error.name === 'AbortError' || !this.answerId) throw error;
     }
     if (!this.hasFinished && !this.answerId) {
-      throw new Error('koneksi terputus sebelum server menerima pertanyaan');
+      throw new Error(t('app.lostBeforeAccepted'));
     }
     await this.#resumeUntilFinished(abortSignal);
   }
@@ -622,11 +660,7 @@ class AnswerStreamFollower {
     let futileAttempts = 0;
     while (!this.hasFinished) {
       if (futileAttempts >= AnswerStreamFollower.MAXIMUM_FUTILE_ATTEMPTS) {
-        throw new AnswerStreamError(
-          'Koneksi ke server terputus dan tidak dapat disambung kembali. ' +
-          'Server tetap menyelesaikan jawabannya; buka kembali percakapan ini ' +
-          'dari panel Percakapan untuk melihatnya.'
-        );
+        throw new AnswerStreamError(t('app.cannotReconnect'));
       }
 
       this.callbacks.onReconnecting();
@@ -642,10 +676,7 @@ class AnswerStreamFollower {
       } catch (error) {
         if (error.name === 'AbortError') throw error;
         if (error.status === 404) {
-          throw new AnswerStreamError(
-            'Jawaban ini tidak lagi tersedia di server — kemungkinan server baru ' +
-            'saja dimulai ulang. Silakan ajukan pertanyaan kembali.'
-          );
+          throw new AnswerStreamError(t('app.answerGone'));
         }
       }
       futileAttempts = this.lastEventNumber > lastEventNumberBefore ? 0 : futileAttempts + 1;
@@ -759,20 +790,50 @@ class SessionPanel {
       this.sessions = result.sessions || [];
       this.render();
     } catch (error) {
-      this.toast.show(`Gagal memuat percakapan: ${error.message}`);
+      this.toast.show(t('app.loadConversationsFailed', { error: error.message }));
     }
   }
 
   /** Marks which session is currently open, without refetching. */
   setActiveSession(sessionId) {
     this.activeSessionId = sessionId;
+    SessionPanel.rememberOpenSession(sessionId);
     this.render();
+  }
+
+  /** Browser-storage key for the open conversation, kept across a reload. */
+  static OPEN_SESSION_KEY = 'exim-rag.open-session';
+
+  /**
+   * Remembers the open conversation for this tab.
+   *
+   * Switching the interface language reloads the page; without this the
+   * reader would land on an empty welcome screen instead of their thread.
+   */
+  static rememberOpenSession(sessionId) {
+    try {
+      if (sessionId) window.sessionStorage.setItem(SessionPanel.OPEN_SESSION_KEY, sessionId);
+      else window.sessionStorage.removeItem(SessionPanel.OPEN_SESSION_KEY);
+    } catch {
+      // Blocked storage: a reload simply starts on the welcome screen.
+    }
+  }
+
+  /** The conversation open before the last reload, if it still exists. */
+  rememberedOpenSession() {
+    let sessionId = null;
+    try {
+      sessionId = window.sessionStorage.getItem(SessionPanel.OPEN_SESSION_KEY);
+    } catch {
+      return null;
+    }
+    return this.sessions.some((session) => session.session_id === sessionId) ? sessionId : null;
   }
 
   /** Paints the session list. */
   render() {
     if (this.sessions.length === 0) {
-      this.listElement.innerHTML = '<p class="session-empty">Belum ada percakapan tersimpan.</p>';
+      this.listElement.innerHTML = `<p class="session-empty">${this.escaper.escape(t('app.noConversations'))}</p>`;
       return;
     }
     this.listElement.innerHTML = this.sessions.map(this.#renderRow.bind(this)).join('');
@@ -796,13 +857,13 @@ class SessionPanel {
         <button class="session-open" data-session-id="${this.escaper.escape(session.session_id)}"
                 title="${this.escaper.escape(session.title)}">
           <span class="session-title">${this.escaper.escape(session.title)}</span>
-          <span class="session-meta">${exchanges} tanya · ${this.formatter.timestamp(session.updated_at)}</span>
+          <span class="session-meta">${this.escaper.escape(t('app.sessionMeta', { count: exchanges, time: this.formatter.timestamp(session.updated_at) }))}</span>
         </button>
         <div class="session-actions">
           <button class="session-rename" data-session-id="${this.escaper.escape(session.session_id)}"
-                  title="Ganti nama">✎</button>
+                  title="${this.escaper.escape(t('app.rename'))}">✎</button>
           <button class="session-delete" data-session-id="${this.escaper.escape(session.session_id)}"
-                  title="Hapus percakapan">✕</button>
+                  title="${this.escaper.escape(t('app.deleteConversation'))}">✕</button>
         </div>
       </div>`;
   }
@@ -815,7 +876,7 @@ class SessionPanel {
       this.setActiveSession(session.session_id);
       if (this.onSessionOpened) this.onSessionOpened(session.session_id, true);
     } catch (error) {
-      this.toast.show(`Gagal membuat percakapan: ${error.message}`);
+      this.toast.show(t('app.createConversationFailed', { error: error.message }));
     }
   }
 
@@ -831,13 +892,13 @@ class SessionPanel {
     clickEvent.stopPropagation();
     const sessionId = clickEvent.currentTarget.dataset.sessionId;
     const current = this.sessions.find((s) => s.session_id === sessionId);
-    const title = window.prompt('Nama percakapan:', current ? current.title : '');
+    const title = window.prompt(t('app.renamePrompt'), current ? current.title : '');
     if (!title) return;
     try {
       await this.api.renameSession(sessionId, title);
       await this.refresh();
     } catch (error) {
-      this.toast.show(`Gagal mengganti nama: ${error.message}`);
+      this.toast.show(t('app.renameFailed', { error: error.message }));
     }
   }
 
@@ -846,21 +907,22 @@ class SessionPanel {
     clickEvent.stopPropagation();
     const sessionId = clickEvent.currentTarget.dataset.sessionId;
     const session = this.sessions.find((s) => s.session_id === sessionId);
-    const label = session ? session.title : 'percakapan ini';
-    if (!window.confirm(`Hapus "${label}"?\n\nSeluruh pertanyaan dan jawaban di dalamnya akan hilang. Dokumen sumber tidak terpengaruh.`)) {
+    const label = session ? session.title : t('app.thisConversation');
+    if (!window.confirm(t('app.confirmDelete', { label }))) {
       return;
     }
     try {
       await this.api.deleteSession(sessionId);
-      this.toast.show('Percakapan dihapus.');
+      this.toast.show(t('app.conversationDeleted'));
       const wasActive = sessionId === this.activeSessionId;
       await this.refresh();
       if (wasActive) {
         this.activeSessionId = null;
+        SessionPanel.rememberOpenSession(null);
         if (this.onSessionOpened) this.onSessionOpened(null, true);
       }
     } catch (error) {
-      this.toast.show(`Gagal menghapus: ${error.message}`);
+      this.toast.show(t('app.deleteFailed', { error: error.message }));
     }
   }
 }
@@ -882,12 +944,12 @@ class StatusPanel {
     try {
       status = await this.api.fetchStatus();
     } catch (error) {
-      this.toast.show(`Gagal memuat status: ${error.message}`);
+      this.toast.show(t('app.loadStatusFailed', { error: error.message }));
       return null;
     }
 
     this.#renderSource(status.source);
-    this.#renderIndex(status.index);
+    this.#renderIndex(status.index, status.ocr);
     this.#renderModels(status);
     this.#renderBackends(status.language_models);
     this.#renderClientScope(status.client);
@@ -902,8 +964,8 @@ class StatusPanel {
     const line = document.getElementById('client-line');
     if (!line) return;
     line.textContent = isLocal
-      ? 'Akses: komputer ini — dokumen dapat diunduh atau dibuka langsung'
-      : `Akses: jaringan (${client ? client.address : '?'}) — dokumen tersedia lewat Unduh`;
+      ? t('app.accessLocal')
+      : t('app.accessNetwork', { address: client ? client.address : '?' });
   }
 
   /** Paints the corpus location and read-only assurance (admins only). */
@@ -914,45 +976,58 @@ class StatusPanel {
     const pathElement = document.getElementById('source-path');
     pathElement.textContent = source.directory;
     if (!source.exists) {
-      pathElement.textContent += '  ⚠ tidak ditemukan';
+      pathElement.textContent += `  ${t('app.notFound')}`;
     }
   }
 
-  /** Paints document, chunk, size and failure counters. */
-  #renderIndex(index) {
+  /** Paints document, chunk, size and failure counters, and what OCR made of scans. */
+  #renderIndex(index, ocr) {
     document.getElementById('stat-documents').textContent = this.formatter.count(index.document_count);
     document.getElementById('stat-chunks').textContent = this.formatter.count(index.chunk_count);
     document.getElementById('stat-megabytes').textContent = this.formatter.count(index.total_megabytes);
     document.getElementById('stat-failed').textContent = this.formatter.count(index.failed_count);
     document.getElementById('stat-last-indexed').textContent =
-      `Terakhir diindeks: ${this.formatter.timestamp(index.last_indexed_at)}`;
+      t('app.lastIndexed', { time: this.formatter.timestamp(index.last_indexed_at) });
 
     const scannedLine = document.getElementById('stat-scanned');
-    if (index.scanned_section_count > 0) {
-      scannedLine.textContent =
-        `${this.formatter.count(index.scanned_section_count)} halaman terindikasi hasil pindai ` +
-        `tanpa lapisan teks — aktifkan OCR agar terbaca.`;
-      scannedLine.classList.remove('hidden');
-    } else {
+    const scanned = index.scanned_section_count;
+    if (scanned === 0) {
       scannedLine.classList.add('hidden');
+      return;
     }
+    scannedLine.classList.remove('hidden');
+    if (!ocr.available) {
+      scannedLine.classList.add('warning-line');
+      scannedLine.textContent = t('app.scannedNeedOcr', { count: this.formatter.count(scanned) });
+      return;
+    }
+    // OCR already reads scans; a page it leaves unread is blank, or lies past
+    // the per-document OCR page limit.
+    const unread = scanned - index.ocr_section_count;
+    scannedLine.classList.remove('warning-line');
+    scannedLine.textContent =
+      t('app.scannedRead', {
+        scanned: this.formatter.count(scanned),
+        read: this.formatter.count(index.ocr_section_count),
+      }) +
+      (unread > 0 ? t('app.scannedUnread', { count: this.formatter.count(unread) }) : '.');
   }
 
   /** Paints the hardware, embedding, reranking and OCR lines. */
   #renderModels(status) {
-    document.getElementById('hardware-line').textContent = `Akselerator: ${status.hardware.accelerator}`;
+    document.getElementById('hardware-line').textContent = t('app.accelerator', { name: status.hardware.accelerator });
     document.getElementById('embedding-line').textContent =
       `Embedding: ${status.models.embedding_model} (${status.models.embedding_device})`;
 
     const rerankerLine = document.getElementById('reranker-line');
     rerankerLine.textContent = status.models.reranking_enabled
       ? `Reranker: ${status.models.reranking_model}`
-      : 'Reranker: nonaktif';
+      : t('app.rerankerOff');
 
     const ocrLine = document.getElementById('ocr-line');
     ocrLine.textContent = status.ocr.available
-      ? 'OCR: aktif'
-      : `OCR: ${status.ocr.reason || 'nonaktif'}`;
+      ? t('app.ocrOn')
+      : (status.ocr.reason ? `OCR: ${status.ocr.reason}` : t('app.ocrOff'));
   }
 
   /** Rebuilds the backend dropdown, marking unavailable backends. */
@@ -969,7 +1044,7 @@ class StatusPanel {
       // The model belongs on the option itself: it is the basis for choosing
       // between backends, and putting it only in the detail line below means it
       // is read after the choice, not before.
-      const readiness = backend.is_available ? '' : '  (tidak siap)';
+      const readiness = backend.is_available ? '' : `  ${t('app.notReady')}`;
       option.textContent =
         `${this.#backendLabel(backend.backend_name)} — ${backend.model_name}${readiness}`;
       select.appendChild(option);
@@ -986,7 +1061,7 @@ class StatusPanel {
     // Kept short: the model name is appended after these, and the
     // sidebar dropdown is only so wide.
     const labels = {
-      ollama: 'Ollama (lokal)',
+      ollama: t('app.ollamaLocal'),
       claude_cli: 'Claude Code',
       codex_cli: 'Codex',
       antigravity_cli: 'Antigravity',
@@ -1009,8 +1084,8 @@ class StatusPanel {
     // Sending document excerpts off-machine is a decision the
     // operator should make knowingly, so it is stated on the control itself.
     const privacyNote = backend.runs_locally
-      ? '<span class="privacy-note local">Dokumen tidak meninggalkan komputer ini</span>'
-      : '<span class="privacy-note remote">Kutipan dokumen dikirim ke penyedia layanan</span>';
+      ? `<span class="privacy-note local">${escaper.escape(t('app.privacyLocal'))}</span>`
+      : `<span class="privacy-note remote">${escaper.escape(t('app.privacyRemote'))}</span>`;
 
     detailElement.innerHTML =
       `<span class="indicator ${indicatorClass}"></span>` +
@@ -1072,7 +1147,7 @@ class IngestPanel {
   /** Starts an incremental run that only re-reads changed documents. */
   async handleIncrementalIngest() {
     if (!this.isAdmin) {
-      this.#showPermissionNotice('Anda tidak memiliki hak untuk memperbarui indeks.');
+      this.#showPermissionNotice(t('app.noRightUpdate'));
       return;
     }
     await this.#start(false);
@@ -1081,14 +1156,10 @@ class IngestPanel {
   /** Starts a full rebuild after confirming, since it discards the index. */
   async handleFullRebuild() {
     if (!this.isAdmin) {
-      this.#showPermissionNotice('Anda tidak memiliki hak untuk membangun ulang indeks.');
+      this.#showPermissionNotice(t('app.noRightRebuild'));
       return;
     }
-    const confirmed = window.confirm(
-      'Bangun ulang indeks dari nol?\n\n' +
-      'Seluruh indeks akan dihapus dan semua dokumen dibaca ulang. ' +
-      'Salinan situs sumber di corpus-exim TIDAK akan diubah.'
-    );
+    const confirmed = window.confirm(t('app.confirmRebuild'));
     if (confirmed) await this.#start(true);
   }
 
@@ -1097,9 +1168,10 @@ class IngestPanel {
     this.#setButtonsEnabled(false);
     try {
       const result = await this.api.startIngest(forceFullRebuild);
-      this.toast.show(result.message || 'Proses indexing dimulai.');
+      // The server phrases its reply in Indonesian; only a refusal is shown as is.
+      this.toast.show(result.started === false ? result.message : t('app.ingestStarted'));
     } catch (error) {
-      this.toast.show(`Gagal memulai indexing: ${error.message}`);
+      this.toast.show(t('app.ingestStartFailed', { error: error.message }));
       this.#setButtonsEnabled(true);
       return;
     }
@@ -1145,12 +1217,12 @@ class IngestPanel {
 
     this.#setButtonsEnabled(true);
     if (progress.error_message) {
-      this.toast.show(`Indexing gagal: ${progress.error_message}`);
+      this.toast.show(t('app.ingestFailed', { error: progress.error_message }));
     } else if (progress.phase === 'completed') {
-      this.toast.show(
-        `Indexing selesai dalam ${this.formatter.duration(progress.elapsed_seconds)} — ` +
-        `${this.formatter.count(progress.documents_indexed)} dokumen diindeks.`
-      );
+      this.toast.show(t('app.ingestDone', {
+        duration: this.formatter.duration(progress.elapsed_seconds),
+        count: this.formatter.count(progress.documents_indexed),
+      }));
     }
     if (this.onRunFinished) this.onRunFinished();
   }
@@ -1163,13 +1235,15 @@ class IngestPanel {
     document.getElementById('progress-fill').style.width = `${percentage}%`;
     document.getElementById('progress-caption').textContent =
       `${this.#phaseLabel(progress.phase)} — ${percentage}%`;
-    document.getElementById('progress-detail').textContent =
-      `${this.formatter.count(progress.documents_processed)}/${this.formatter.count(progress.documents_total)} berkas · ` +
-      `${this.formatter.count(progress.documents_indexed)} diindeks · ` +
-      `${this.formatter.count(progress.documents_skipped)} dilewati · ` +
-      `${this.formatter.count(progress.documents_failed)} gagal · ` +
-      `${this.formatter.count(progress.chunks_created)} potongan · ` +
-      `${this.formatter.duration(progress.elapsed_seconds)}`;
+    document.getElementById('progress-detail').textContent = t('app.progressDetail', {
+      processed: this.formatter.count(progress.documents_processed),
+      total: this.formatter.count(progress.documents_total),
+      indexed: this.formatter.count(progress.documents_indexed),
+      skipped: this.formatter.count(progress.documents_skipped),
+      failed: this.formatter.count(progress.documents_failed),
+      chunks: this.formatter.count(progress.chunks_created),
+      duration: this.formatter.duration(progress.elapsed_seconds),
+    });
 
     const logElement = document.getElementById('progress-log-text');
     const combinedLog = (progress.recent_messages || []).join('\n');
@@ -1187,16 +1261,9 @@ class IngestPanel {
 
   /** Translates a pipeline phase identifier into a readable label. */
   #phaseLabel(phase) {
-    const labels = {
-      idle: 'Menunggu',
-      starting: 'Memulai',
-      scanning: 'Memindai berkas',
-      indexing: 'Membaca & mengindeks',
-      saving: 'Menyimpan indeks',
-      completed: 'Selesai',
-      failed: 'Gagal',
-    };
-    return labels[phase] || phase;
+    const key = `app.phase.${phase}`;
+    const label = t(key);
+    return label === key ? phase : label;
   }
 
   /** Enables or disables both ingest buttons together. */
@@ -1235,7 +1302,7 @@ class AnswerRenderer {
 
     this.container.innerHTML =
       '<div class="answer-status" id="answer-status-line">' +
-      '<span class="spinner"></span><span>Mencari dokumen relevan…</span></div>' +
+      `<span class="spinner"></span><span>${this.escaper.escape(t('app.searchingDocuments'))}</span></div>` +
       '<div class="answer-text"></div>';
     this.statusElement = this.container.querySelector('.answer-status');
     this.textElement = this.container.querySelector('.answer-text');
@@ -1243,11 +1310,31 @@ class AnswerRenderer {
 
   /** Routes one stream event to the matching render method. */
   handleEvent(event) {
-    if (event.name === 'sources') this.renderCitations(event.payload.citations || []);
+    if (event.name === 'sources') {
+      this.renderSearchNote(event.payload);
+      this.renderCitations(event.payload.citations || []);
+    }
     else if (event.name === 'status') this.setStatusMessage(event.payload.message);
     else if (event.name === 'token') this.appendText(event.payload.text || '');
     else if (event.name === 'error') this.renderError(event.payload.message);
     else if (event.name === 'done') this.finish(event.payload);
+  }
+
+  /**
+   * Says which country's documents were searched, and with what wording.
+   *
+   * The question was restated in that country's language before searching;
+   * showing the restatement lets the reader see, and judge, what was sought.
+   */
+  renderSearchNote(payload) {
+    if (!payload.search_query) return;
+    const note = document.createElement('div');
+    note.className = 'search-note';
+    note.textContent = t('app.searchedAs', {
+      country: interfaceLanguage.countryName(payload.country),
+      query: payload.search_query,
+    });
+    this.container.insertBefore(note, this.container.firstChild);
   }
 
   /** Replaces the status line's text while keeping the spinner. */
@@ -1265,13 +1352,13 @@ class AnswerRenderer {
    */
   showConnectionNotice() {
     this.statusElement.classList.add('reconnecting');
-    this.#writeStatusLabel('Koneksi terputus — menyambung kembali; jawaban tetap diproses di server…');
+    this.#writeStatusLabel(t('app.reconnecting'));
   }
 
   /** Restores the status line once the connection is back. */
   clearConnectionNotice() {
     this.statusElement.classList.remove('reconnecting');
-    this.#writeStatusLabel(this.statusMessage || 'Mencari dokumen relevan…');
+    this.#writeStatusLabel(this.statusMessage || t('app.searchingDocuments'));
   }
 
   /** Writes the status line's text, if the line is still on screen. */
@@ -1328,7 +1415,7 @@ class AnswerRenderer {
 
     const summary = document.createElement('summary');
     summary.className = 'sources-heading';
-    summary.textContent = `Sumber (${citations.length})`;
+    summary.textContent = t('app.sources', { count: citations.length });
     section.appendChild(summary);
 
     for (const citation of citations) {
@@ -1345,7 +1432,7 @@ class AnswerRenderer {
     card.className = 'source-card';
 
     const badges = citation.retrieval_methods
-      .map((method) => `<span class="badge ${method === 'semantic' ? 'semantic' : 'keyword'}">${method === 'semantic' ? 'semantik' : 'kata kunci'}</span>`)
+      .map((method) => `<span class="badge ${method === 'semantic' ? 'semantic' : 'keyword'}">${this.escaper.escape(t(method === 'semantic' ? 'app.semantic' : 'app.keyword'))}</span>`)
       .join('');
     const ocrBadge = citation.produced_by_ocr ? '<span class="badge ocr">OCR</span>' : '';
 
@@ -1358,7 +1445,7 @@ class AnswerRenderer {
             title="${this.escaper.escape(link.url)}">${this.escaper.escape(link.label)} ↗</a>`)
       .join('');
     const externalRow = externalLinks
-      ? `<div class="source-external">Buka sumber asli: ${externalLinks}</div>`
+      ? `<div class="source-external">${this.escaper.escape(t('app.openOriginal'))} ${externalLinks}</div>`
       : '';
 
     card.innerHTML = `
@@ -1367,18 +1454,18 @@ class AnswerRenderer {
         <span class="source-name">${this.escaper.escape(citation.document_name)}</span>
       </div>
       <div class="source-meta">${this.escaper.escape(citation.relative_path)} · ${this.escaper.escape(citation.section_label)}</div>
-      <div class="badge-row">${badges}${ocrBadge}<span class="badge">skor ${citation.relevance_score}</span></div>
+      <div class="badge-row">${badges}${ocrBadge}<span class="badge">${this.escaper.escape(t('app.score', { score: citation.relevance_score }))}</span></div>
       ${externalRow}
       <div class="source-excerpt">${this.escaper.escape(citation.excerpt)}</div>
       <div class="source-actions">
         <a class="link-button" download
-           href="/api/documents/${encodeURIComponent(citation.document_id)}/download">Unduh dokumen</a>
+           href="/api/documents/${encodeURIComponent(citation.document_id)}/download">${this.escaper.escape(t('app.downloadDocument'))}</a>
         ${AnswerRenderer.isLocalClient
-          ? '<button class="link-button" data-action="reveal">Tampilkan di folder</button>' +
-            '<button class="link-button" data-action="open">Buka dokumen</button>'
+          ? `<button class="link-button" data-action="reveal">${this.escaper.escape(t('app.showInFolder'))}</button>` +
+            `<button class="link-button" data-action="open">${this.escaper.escape(t('app.openDocument'))}</button>`
           : ''}
-        <button class="link-button" data-action="copy-excerpt">Salin kutipan</button>
-        <button class="link-button" data-action="copy-path">Salin lokasi</button>
+        <button class="link-button" data-action="copy-excerpt">${this.escaper.escape(t('app.copyExcerpt'))}</button>
+        <button class="link-button" data-action="copy-path">${this.escaper.escape(t('app.copyLocation'))}</button>
       </div>`;
 
     for (const button of card.querySelectorAll('button.link-button')) {
@@ -1400,7 +1487,7 @@ class AnswerRenderer {
 
     if (action === 'copy-path') {
       const copied = await this.clipboard.copy(button.dataset.relativePath || '');
-      this.toast.show(copied ? 'Lokasi berkas disalin.' : 'Gagal menyalin.');
+      this.toast.show(t(copied ? 'app.locationCopied' : 'app.copyFailed'));
       return;
     }
     if (action === 'copy-excerpt') {
@@ -1411,13 +1498,13 @@ class AnswerRenderer {
         `— ${button.dataset.documentName} (${button.dataset.sectionLabel})\n` +
         `  ${button.dataset.relativePath}`;
       const copied = await this.clipboard.copy(attributed);
-      this.toast.show(copied ? 'Kutipan disalin beserta sumbernya.' : 'Gagal menyalin.');
+      this.toast.show(t(copied ? 'app.excerptCopied' : 'app.copyFailed'));
       return;
     }
     try {
       await this.api.runFileAction(button.dataset.documentId, action);
     } catch (error) {
-      this.toast.show(`Gagal membuka: ${error.message}`);
+      this.toast.show(t('app.openFailed', { error: error.message }));
     }
   }
 
@@ -1433,11 +1520,11 @@ class AnswerRenderer {
   finish(summary) {
     if (this.statusElement && this.statusElement.parentNode) this.statusElement.remove();
     if (!this.accumulatedText.trim()) {
-      this.textElement.textContent = '(Model tidak menghasilkan jawaban.)';
+      this.textElement.textContent = t('app.noAnswer');
     }
 
     const parts = [`${this.formatter.duration(summary.elapsed_seconds)}`];
-    if (summary.passage_count !== undefined) parts.push(`${summary.passage_count} sumber`);
+    if (summary.passage_count !== undefined) parts.push(t('app.sourceTotal', { count: summary.passage_count }));
     if (summary.model_name) {
       parts.push(`${summary.backend_name} · ${summary.model_name}`);
     }
@@ -1447,8 +1534,8 @@ class AnswerRenderer {
     footer.innerHTML =
       `<span class="answer-meta">${this.escaper.escape(parts.join(' · '))}</span>` +
       `<span class="answer-copy-actions">` +
-      `<button class="link-button" data-copy="answer">Salin jawaban</button>` +
-      `<button class="link-button" data-copy="with-sources">Salin + sumber</button>` +
+      `<button class="link-button" data-copy="answer">${this.escaper.escape(t('app.copyAnswer'))}</button>` +
+      `<button class="link-button" data-copy="with-sources">${this.escaper.escape(t('app.copyWithSources'))}</button>` +
       `</span>`;
     for (const button of footer.querySelectorAll('[data-copy]')) {
       button.addEventListener('click', this.handleCopy.bind(this));
@@ -1469,7 +1556,7 @@ class AnswerRenderer {
       : this.accumulatedText;
 
     const copied = await this.clipboard.copy(text);
-    this.toast.show(copied ? 'Disalin ke papan klip.' : 'Gagal menyalin ke papan klip.');
+    this.toast.show(t(copied ? 'app.copiedToClipboard' : 'app.clipboardFailed'));
   }
 
   /** Returns the answer followed by a numbered list of its sources. */
@@ -1478,7 +1565,7 @@ class AnswerRenderer {
     const lines = this.citations.map((citation) =>
       `[${citation.citation_number}] ${citation.document_name} — ${citation.section_label}\n` +
       `    ${citation.relative_path}`);
-    return `${this.accumulatedText}\n\nSumber:\n${lines.join('\n')}`;
+    return `${this.accumulatedText}\n\n${t('app.sourcesHeading')}\n${lines.join('\n')}`;
   }
 }
 
@@ -1512,10 +1599,11 @@ class ConversationView {
     // The keyboard hint means nothing on a touch keyboard, and on a phone the
     // full placeholder wraps and is cut off inside the one-line box.
     if (window.matchMedia('(pointer: coarse)').matches) {
-      this.inputElement.placeholder = 'Tulis pertanyaan…';
+      this.inputElement.placeholder = t('app.questionPlaceholderShort');
     }
 
-    this.toolbarElement = document.getElementById('conversation-toolbar');
+    //: The source-panel half of the bar; "Aturan negara" beside it stays visible.
+    this.toolbarElement = document.getElementById('toolbar-sources');
     document.getElementById('button-expand-sources')
       .addEventListener('click', this.handleExpandAllSources.bind(this));
     document.getElementById('button-collapse-sources')
@@ -1635,16 +1723,17 @@ class ConversationView {
           backend_name: this.settings.backendName() || null,
           passage_count: this.settings.passageCount(),
           session_id: this.sessionId,
+          language: interfaceLanguage.code,
         },
         this.abortController.signal
       );
     } catch (error) {
       if (error.name === 'AbortError') {
-        renderer.renderError('Dihentikan oleh pengguna.');
+        renderer.renderError(t('app.stoppedByUser'));
       } else if (error instanceof AnswerStreamError) {
         renderer.renderError(error.message);
       } else {
-        renderer.renderError(`Gagal menghubungi server: ${error.message}`);
+        renderer.renderError(t('app.serverUnreachable', { error: error.message }));
       }
       renderer.finish({ elapsed_seconds: 0 });
     } finally {
@@ -1661,9 +1750,8 @@ class ConversationView {
   startNewConversation(sessionId) {
     this.sessionId = sessionId || null;
     this.conversationElement.innerHTML =
-      '<div class="welcome"><h2>Percakapan baru</h2>' +
-      '<p>Ajukan pertanyaan; jawaban dan sumbernya akan tersimpan otomatis ' +
-      'sehingga dapat dilanjutkan kapan saja.</p></div>';
+      `<div class="welcome"><h2>${this.escaper.escape(t('app.newConversationTitle'))}</h2>` +
+      `<p>${this.escaper.escape(t('app.newConversationBody'))}</p></div>`;
     this.#refreshToolbarVisibility();
   }
 
@@ -1675,7 +1763,7 @@ class ConversationView {
     try {
       session = await this.api.fetchSession(sessionId);
     } catch (error) {
-      this.toast.show(`Gagal memuat percakapan: ${error.message}`);
+      this.toast.show(t('app.loadConversationsFailed', { error: error.message }));
       return;
     }
 
@@ -1730,7 +1818,7 @@ class ConversationView {
     const message = document.createElement('div');
     message.className = 'message question';
     message.innerHTML =
-      '<button class="question-copy" title="Salin pertanyaan">Salin</button>' +
+      `<button class="question-copy" title="${this.escaper.escape(t('app.copyQuestionTitle'))}">${this.escaper.escape(t('app.copy'))}</button>` +
       `<div class="question-bubble">${this.escaper.escape(question)}</div>`;
 
     const copyButton = message.querySelector('.question-copy');
@@ -1746,7 +1834,7 @@ class ConversationView {
   /** Copies one question to the clipboard. */
   async handleCopyQuestion(clickEvent) {
     const copied = await this.clipboard.copy(clickEvent.currentTarget.dataset.question || '');
-    this.toast.show(copied ? 'Pertanyaan disalin.' : 'Gagal menyalin ke papan klip.');
+    this.toast.show(t(copied ? 'app.questionCopied' : 'app.clipboardFailed'));
   }
 
   /** Appends and returns the container an AnswerRenderer will fill. */
@@ -1794,7 +1882,7 @@ class BrowsePanel {
     if (!question) return;
 
     const resultsElement = document.getElementById('browse-results');
-    resultsElement.innerHTML = '<p class="empty-hint">Mencari…</p>';
+    resultsElement.innerHTML = `<p class="empty-hint">${this.escaper.escape(t('app.searching'))}</p>`;
 
     try {
       const result = await this.api.search({
@@ -1804,14 +1892,14 @@ class BrowsePanel {
       });
       this.#render(resultsElement, result.passages);
     } catch (error) {
-      resultsElement.innerHTML = `<p class="empty-hint">Gagal mencari: ${this.escaper.escape(error.message)}</p>`;
+      resultsElement.innerHTML = `<p class="empty-hint">${this.escaper.escape(t('app.searchFailed', { error: error.message }))}</p>`;
     }
   }
 
   /** Paints the passage list, or an empty-state message. */
   #render(resultsElement, passages) {
     if (!passages || passages.length === 0) {
-      resultsElement.innerHTML = '<p class="empty-hint">Tidak ada potongan yang cocok.</p>';
+      resultsElement.innerHTML = `<p class="empty-hint">${this.escaper.escape(t('app.noPassages'))}</p>`;
       return;
     }
     resultsElement.innerHTML = passages.map(this.#renderPassage.bind(this)).join('');
@@ -1839,17 +1927,17 @@ class BrowsePanel {
       `— ${button.dataset.documentName} (${button.dataset.sectionLabel})\n` +
       `  ${button.dataset.relativePath}`;
     const copied = await this.clipboard.copy(attributed);
-    this.toast.show(copied ? 'Potongan disalin beserta sumbernya.' : 'Gagal menyalin.');
+    this.toast.show(t(copied ? 'app.passageCopied' : 'app.copyFailed'));
   }
 
   /** Renders one passage card with its individual retrieval scores. */
   #renderPassage(passage) {
     const scoreParts = [];
     if (passage.dense_score !== null && passage.dense_score !== undefined) {
-      scoreParts.push(`semantik ${passage.dense_score.toFixed(3)}`);
+      scoreParts.push(`${t('app.semantic')} ${passage.dense_score.toFixed(3)}`);
     }
     if (passage.sparse_score !== null && passage.sparse_score !== undefined) {
-      scoreParts.push(`kata kunci ${passage.sparse_score.toFixed(2)}`);
+      scoreParts.push(`${t('app.keyword')} ${passage.sparse_score.toFixed(2)}`);
     }
     if (passage.reranked_score !== null && passage.reranked_score !== undefined) {
       scoreParts.push(`rerank ${passage.reranked_score.toFixed(3)}`);
@@ -1868,9 +1956,9 @@ class BrowsePanel {
         <div class="passage-footer">
           <span class="passage-scores">${scoreParts.map((part) => this.escaper.escape(part)).join(' · ')}</span>
           <span class="passage-actions">
-            <button class="link-button passage-copy">Salin potongan</button>
+            <button class="link-button passage-copy">${this.escaper.escape(t('app.copyPassage'))}</button>
             <a class="link-button" download
-               href="/api/documents/${encodeURIComponent(passage.document_id)}/download">Unduh</a>
+               href="/api/documents/${encodeURIComponent(passage.document_id)}/download">${this.escaper.escape(t('app.download'))}</a>
           </span>
         </div>
       </div>`;
@@ -1907,7 +1995,7 @@ class DocumentsPanel {
       this.loadedDocuments = result.documents || [];
       this.renderRows();
     } catch (error) {
-      this.toast.show(`Gagal memuat daftar dokumen: ${error.message}`);
+      this.toast.show(t('app.loadDocumentsFailed', { error: error.message }));
     }
   }
 
@@ -1921,7 +2009,7 @@ class DocumentsPanel {
       : this.loadedDocuments;
 
     if (visibleDocuments.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);padding:22px 10px">Tidak ada dokumen.</td></tr>';
+      tableBody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted);padding:22px 10px">${this.escaper.escape(t('app.noDocuments'))}</td></tr>`;
       return;
     }
     tableBody.innerHTML = visibleDocuments.map(this.#renderRow.bind(this)).join('');
@@ -1932,12 +2020,16 @@ class DocumentsPanel {
 
   /** Renders one table row for a document. */
   #renderRow(documentRecord) {
-    const statusLabels = { indexed: 'Terindeks', empty: 'Kosong', failed: 'Gagal' };
+    const statusLabels = {
+      indexed: t('app.documentStatus.indexed'),
+      empty: t('app.documentStatus.empty'),
+      failed: t('app.documentStatus.failed'),
+    };
     const errorLine = documentRecord.error_message
       ? `<div class="document-path-cell" style="color:var(--danger)">${this.escaper.escape(documentRecord.error_message)}</div>`
       : '';
     const scannedLine = documentRecord.scanned_section_count > 0
-      ? `<div class="document-path-cell" style="color:var(--warning)">${documentRecord.scanned_section_count} halaman hasil pindai</div>`
+      ? `<div class="document-path-cell" style="color:var(--warning)">${this.escaper.escape(t('app.scannedPages', { count: documentRecord.scanned_section_count }))}</div>`
       : '';
 
     return `
@@ -1947,16 +2039,16 @@ class DocumentsPanel {
           <div class="document-path-cell">${this.escaper.escape(documentRecord.relative_path)}</div>
           ${errorLine}${scannedLine}
         </td>
-        <td>${this.escaper.escape(documentRecord.top_level_folder)}</td>
+        <td>${this.escaper.escape(interfaceLanguage.countryName(documentRecord.top_level_folder))}</td>
         <td><span class="status-pill ${documentRecord.status}">${statusLabels[documentRecord.status] || documentRecord.status}</span></td>
         <td class="numeric">${this.formatter.fileSize(documentRecord.size_bytes)}</td>
         <td class="numeric">${this.formatter.count(documentRecord.chunk_count)}</td>
         <td class="numeric">${this.formatter.count(documentRecord.section_count)}</td>
         <td class="action-cell">
           <a class="link-button" download
-             href="/api/documents/${encodeURIComponent(documentRecord.document_id)}/download">Unduh</a>
+             href="/api/documents/${encodeURIComponent(documentRecord.document_id)}/download">${this.escaper.escape(t('app.download'))}</a>
           ${this.isLocalClient
-            ? `<button class="link-button" data-document-id="${this.escaper.escape(documentRecord.document_id)}">Tampilkan</button>`
+            ? `<button class="link-button" data-document-id="${this.escaper.escape(documentRecord.document_id)}">${this.escaper.escape(t('app.show'))}</button>`
             : ''}
         </td>
       </tr>`;
@@ -1972,7 +2064,7 @@ class DocumentsPanel {
     try {
       await this.api.runFileAction(clickEvent.currentTarget.dataset.documentId, 'reveal');
     } catch (error) {
-      this.toast.show(`Gagal membuka: ${error.message}`);
+      this.toast.show(t('app.openFailed', { error: error.message }));
     }
   }
 }
@@ -2005,9 +2097,9 @@ class TabController {
 
 /** Reads the current values of the sidebar's retrieval controls. */
 class RetrievalSettingsReader {
-  /** The selected folder filter, or an empty string for the whole corpus. */
+  /** The country whose rules the question is about: a top-level corpus folder. */
   folderFilter() {
-    return document.getElementById('select-folder').value;
+    return document.getElementById('select-country').value;
   }
 
   /** The selected language-model backend identifier. */
@@ -2018,6 +2110,119 @@ class RetrievalSettingsReader {
   /** How many passages to place in the answer context. */
   passageCount() {
     return Number(document.getElementById('input-passages').value);
+  }
+}
+
+/**
+ * "Aturan negara" as a list with flags.
+ *
+ * A native select cannot show images, so the choice is shown here instead.
+ * The hidden select beside it still holds the value the rest of the page
+ * reads, and every choice made here is announced on it as a change.
+ */
+class CountryPicker {
+  constructor(select) {
+    this.select = select;
+    this.button = document.getElementById('country-button');
+    this.list = document.getElementById('country-list');
+    this.escaper = new HtmlEscaper();
+
+    this.button.addEventListener('click', this.handleButtonClick.bind(this));
+    this.button.addEventListener('keydown', this.handleButtonKeyDown.bind(this));
+    this.list.addEventListener('keydown', this.handleListKeyDown.bind(this));
+    this.list.addEventListener('click', this.handleListClick.bind(this));
+    document.addEventListener('click', this.handleDocumentClick.bind(this));
+    this.select.addEventListener('change', this.render.bind(this));
+  }
+
+  /** Redraws the button and the list from the select's options. */
+  render() {
+    const options = [...this.select.options];
+    const chosen = options.find((option) => option.value === this.select.value);
+    this.button.innerHTML = chosen
+      ? `${this.#entry(chosen)}<span class="country-caret" aria-hidden="true">▾</span>`
+      : '';
+    this.list.innerHTML = options
+      .map((option) =>
+        `<li role="option" tabindex="-1" data-value="${this.escaper.escape(option.value)}"` +
+        ` aria-selected="${option.value === this.select.value}">${this.#entry(option)}</li>`)
+      .join('');
+  }
+
+  /** Opens or closes the list. */
+  handleButtonClick(clickEvent) {
+    clickEvent.stopPropagation();
+    if (this.#isOpen()) this.close();
+    else this.#open();
+  }
+
+  /** Arrow keys, Enter and Space open the list from the button. */
+  handleButtonKeyDown(keyEvent) {
+    if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(keyEvent.key)) {
+      keyEvent.preventDefault();
+      this.#open();
+    }
+  }
+
+  /** Moves through the list, chooses, or closes it, from the keyboard. */
+  handleListKeyDown(keyEvent) {
+    const items = [...this.list.querySelectorAll('li')];
+    const index = items.indexOf(document.activeElement);
+    if (keyEvent.key === 'ArrowDown' || keyEvent.key === 'ArrowUp') {
+      keyEvent.preventDefault();
+      const step = keyEvent.key === 'ArrowDown' ? 1 : -1;
+      items[(index + step + items.length) % items.length].focus();
+    } else if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+      keyEvent.preventDefault();
+      if (items[index]) this.#choose(items[index].dataset.value);
+    } else if (keyEvent.key === 'Escape' || keyEvent.key === 'Tab') {
+      this.close();
+      if (keyEvent.key === 'Escape') this.button.focus();
+    }
+  }
+
+  /** Chooses the clicked country. */
+  handleListClick(clickEvent) {
+    const item = clickEvent.target.closest('li');
+    if (item) this.#choose(item.dataset.value);
+  }
+
+  /** A click anywhere else closes the list. */
+  handleDocumentClick(clickEvent) {
+    if (this.#isOpen() && !this.list.contains(clickEvent.target)) this.close();
+  }
+
+  /** Closes the list. */
+  close() {
+    this.list.classList.add('hidden');
+    this.button.setAttribute('aria-expanded', 'false');
+  }
+
+  #open() {
+    if (this.select.options.length === 0) return;
+    this.list.classList.remove('hidden');
+    this.button.setAttribute('aria-expanded', 'true');
+    const selected = this.list.querySelector('[aria-selected="true"]') || this.list.querySelector('li');
+    if (selected) selected.focus();
+  }
+
+  #isOpen() {
+    return !this.list.classList.contains('hidden');
+  }
+
+  /** Sets the select, announces the change, and returns to the button. */
+  #choose(country) {
+    this.close();
+    this.button.focus();
+    if (country === this.select.value) return;
+    this.select.value = country;
+    this.select.dispatchEvent(new Event('change'));
+  }
+
+  /** One country as flag and name. */
+  #entry(option) {
+    return `<span class="country-flag" aria-hidden="true">${flagImage(option.value)}</span>` +
+      `<span>${this.escaper.escape(option.textContent)}</span>`;
   }
 }
 
@@ -2059,7 +2264,7 @@ class AccountBar {
     try {
       await this.api.signOut();
     } catch (error) {
-      this.toast.show(`Gagal keluar: ${error.message}`);
+      this.toast.show(t('app.signOutFailed', { error: error.message }));
       return;
     }
     window.location.assign('/');
@@ -2166,7 +2371,7 @@ class SidebarController {
     const isShowing = this.narrowScreen.matches
       ? this.layout.classList.contains('sidebar-open')
       : !this.layout.classList.contains('sidebar-collapsed');
-    const label = isShowing ? 'Sembunyikan panel samping' : 'Tampilkan panel samping';
+    const label = t(isShowing ? 'app.hideSidebar' : 'app.showSidebar');
     this.toggleButton.setAttribute('aria-expanded', String(isShowing));
     this.toggleButton.setAttribute('aria-label', label);
     this.toggleButton.title = label;
@@ -2223,6 +2428,9 @@ class Application {
       .addEventListener('change', this.statusPanel.renderSelectedBackendDetail.bind(this.statusPanel));
     document.getElementById('input-passages')
       .addEventListener('input', this.handlePassageCountChange.bind(this));
+    document.getElementById('select-country')
+      .addEventListener('change', this.handleCountryChange.bind(this));
+    this.countryPicker = new CountryPicker(document.getElementById('select-country'));
   }
 
   /** Loads initial state and resumes any indexing run already in progress. */
@@ -2232,8 +2440,13 @@ class Application {
     this.ingestPanel.setAdministrator(this.accountBar.isAdmin);
     const status = await this.statusPanel.refresh();
     this.documentsPanel.setLocalClient(Boolean(status && status.client && status.client.is_local));
-    await this.refreshFolders();
+    await this.refreshCountries();
     await this.sessionPanel.refresh();
+    const openSessionId = this.sessionPanel.rememberedOpenSession();
+    if (openSessionId) {
+      this.sessionPanel.setActiveSession(openSessionId);
+      await this.conversation.openSession(openSessionId);
+    }
     await this.ingestPanel.resumeIfRunning();
   }
 
@@ -2254,29 +2467,63 @@ class Application {
     if (sessionId) this.sessionPanel.setActiveSession(sessionId);
   }
 
-  /** Repopulates the folder filter from the index. */
-  async refreshFolders() {
+  /** Browser-storage key for the country chosen under "Aturan negara". */
+  static COUNTRY_KEY = 'exim-rag.country';
+
+  /** The country each interface language's readers most likely ask about. */
+  static COUNTRY_OF_LANGUAGE = { id: 'Indonesia', vi: 'Vietnam' };
+
+  /**
+   * Fills "Aturan negara" with the countries in the index.
+   *
+   * One country at a time, never all: each question is restated in that
+   * country's language and searched only in its documents, so rules of two
+   * countries are never mixed in one answer. The reader's last choice is kept;
+   * otherwise the country of the interface language, otherwise the first.
+   */
+  async refreshCountries() {
+    let countries = [];
     try {
-      const result = await this.api.fetchFolders();
-      const select = document.getElementById('select-folder');
-      const previousChoice = select.value;
-      select.innerHTML = '<option value="">Semua folder</option>';
-      for (const folderName of result.folders || []) {
-        const option = document.createElement('option');
-        option.value = folderName;
-        option.textContent = folderName;
-        select.appendChild(option);
-      }
-      select.value = previousChoice;
+      countries = (await this.api.fetchFolders()).folders || [];
     } catch {
-      /* An empty index has no folders yet; the default option is enough. */
+      /* An empty index has no countries yet. */
+    }
+    const select = document.getElementById('select-country');
+    const previousChoice = select.value || this.#rememberedCountry();
+    select.innerHTML = '';
+    for (const country of countries) {
+      const option = document.createElement('option');
+      option.value = country;
+      option.textContent = interfaceLanguage.countryName(country);
+      select.appendChild(option);
+    }
+    const preferred = [previousChoice, Application.COUNTRY_OF_LANGUAGE[interfaceLanguage.code]];
+    select.value = preferred.find((country) => countries.includes(country)) || countries[0] || '';
+    this.countryPicker.render();
+  }
+
+  /** Remembers the chosen country for the next visit. */
+  handleCountryChange() {
+    try {
+      window.localStorage.setItem(Application.COUNTRY_KEY, document.getElementById('select-country').value);
+    } catch {
+      // Blocked storage: the choice still holds for this visit.
     }
   }
 
-  /** Refreshes status and filters once an indexing run completes. */
+  /** The country chosen on an earlier visit, if storage allows. */
+  #rememberedCountry() {
+    try {
+      return window.localStorage.getItem(Application.COUNTRY_KEY) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  /** Refreshes status and the country list once an indexing run completes. */
   async handleIngestFinished() {
     await this.statusPanel.refresh();
-    await this.refreshFolders();
+    await this.refreshCountries();
   }
 
   /** Loads the document table the first time its tab is opened. */
@@ -2294,6 +2541,8 @@ class Application {
 }
 
 document.addEventListener('DOMContentLoaded', function bootstrapApplication() {
+  interfaceLanguage.apply();
+  interfaceLanguage.renderSwitchers();
   const application = new Application();
   application.start();
 });

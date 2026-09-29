@@ -13,6 +13,7 @@ character-ratio estimate when it is not.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from abc import ABC, abstractmethod
 
@@ -47,13 +48,19 @@ class CharacterRatioTokenCounter(TokenCounter):
 class TransformerTokenCounter(TokenCounter):
     """Counts tokens exactly, using a HuggingFace tokenizer."""
 
-    def __init__(self, tokenizer) -> None:
-        """Wrap an already-loaded tokenizer instance."""
+    def __init__(self, tokenizer, lock=None) -> None:
+        """Wrap an already-loaded tokenizer, and the lock its other users hold.
+
+        The tokenizer belongs to the embedding model, which answers questions
+        while this counter chunks new files; see :class:`TextEmbedder`.
+        """
         self._tokenizer = tokenizer
+        self._lock = lock or contextlib.nullcontext()
 
     def count(self, text: str) -> int:
         """Return the exact token count, excluding special tokens."""
-        return len(self._tokenizer.encode(text, add_special_tokens=False))
+        with self._lock:
+            return len(self._tokenizer.encode(text, add_special_tokens=False))
 
 
 class TokenAwareChunker:

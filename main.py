@@ -86,7 +86,7 @@ class CommandLineInterface:
             default="beacukai",
             help=(
                 "Situs yang diambil (bawaan: beacukai). "
-                "Pilihan: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei, pajak"
+                "Pilihan: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei, pajak, cong-bao"
             ),
         )
         crawl_parser.add_argument(
@@ -151,7 +151,7 @@ class CommandLineInterface:
             return 1
         section_names = parsed.sections.split(",") if parsed.sections else None
         print(f"\n  Situs       : {site.label}")
-        print(f"  Menyimpan ke: {SETTINGS.source_directory / site.folder}")
+        print(f"  Menyimpan ke: {SETTINGS.source_directory / site.country / site.folder}")
         print(f"  Mode: {'penuh' if parsed.full else 'sampel'}"
               + (f", maks {parsed.limit} per bagian" if parsed.limit else "") + "\n")
         try:
@@ -366,6 +366,7 @@ class CommandLineInterface:
         """Answer one question, streaming the result to standard output."""
         from app.embeddings import TextEmbedder  # noqa: F401  (warms the import chain)
         from app.ingestion import TEXT_EMBEDDER
+        from app.query_rewriting import QUERY_REWRITER
         from app.rag import LANGUAGE_MODEL_FACTORY, QuestionRequest, RagEngine
         from app.retrieval import CROSS_ENCODER_RERANKER, HybridRetriever
         from app.storage import DOCUMENT_CATALOGUE, VECTOR_INDEX
@@ -377,7 +378,7 @@ class CommandLineInterface:
             embedder=TEXT_EMBEDDER,
             reranker=CROSS_ENCODER_RERANKER,
         )
-        engine = RagEngine(SETTINGS, retriever, LANGUAGE_MODEL_FACTORY)
+        engine = RagEngine(SETTINGS, retriever, LANGUAGE_MODEL_FACTORY, query_rewriter=QUERY_REWRITER)
         request = QuestionRequest(
             question=parsed.question,
             folder_filter=parsed.folder,

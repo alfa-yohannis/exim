@@ -61,6 +61,11 @@ class TextEmbedder:
     field concurrent requests while an ingest run is still warming the model up.
     Passages and queries share one encoder; BGE-M3 needs no instruction prefix,
     unlike the E5 family.
+
+    The loaded model is guarded too. Its fast tokenizer cannot be used from two
+    threads at once — it raises "Already borrowed" — and the server indexes new
+    files in the background while questions arrive, so every encode, and the
+    chunker's token counting, takes turns through one lock.
     """
 
     def __init__(self, settings: Settings, device_resolver: ComputeDeviceResolver | None = None) -> None:
@@ -70,6 +75,7 @@ class TextEmbedder:
         self._model = None
         self._resolved_device: str | None = None
         self._load_lock = threading.Lock()
+        self._use_lock = threading.Lock()
 
     @property
     def is_loaded(self) -> bool:
@@ -140,7 +146,7 @@ class TextEmbedder:
         if self._model is None:
             return CharacterRatioTokenCounter()
         try:
-            return TransformerTokenCounter(self._model.tokenizer)
+            return TransformerTokenCounter(self._model.tokenizer, self._use_lock)
         except AttributeError:
             return CharacterRatioTokenCounter()
 
@@ -163,13 +169,15 @@ class TextEmbedder:
         encoded_batches: list[np.ndarray] = []
         for start_index in range(0, len(passages), batch_size):
             batch = passages[start_index : start_index + batch_size]
-            batch_vectors = self._model.encode(
-                batch,
-                batch_size=batch_size,
-                convert_to_numpy=True,
-                normalize_embeddings=True,
-                show_progress_bar=False,
-            )
+            # Per batch, so a question waits for one batch rather than a document.
+            with self._use_lock:
+                batch_vectors = self._model.encode(
+                    batch,
+                    batch_size=batch_size,
+                    convert_to_numpy=True,
+                    normalize_embeddings=True,
+                    show_progress_bar=False,
+                )
             encoded_batches.append(np.asarray(batch_vectors, dtype=np.float32))
             if progress_callback is not None:
                 progress_callback(min(start_index + batch_size, len(passages)), len(passages))
@@ -178,10 +186,11 @@ class TextEmbedder:
     def encode_question(self, question: str) -> np.ndarray:
         """Encode one question into a single normalised vector."""
         self.load()
-        vector = self._model.encode(
-            [question],
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        )
+        with self._use_lock:
+            vector = self._model.encode(
+                [question],
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
         return np.asarray(vector, dtype=np.float32)[0]

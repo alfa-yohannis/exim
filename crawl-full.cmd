@@ -18,8 +18,9 @@ set PYTHONIOENCODING=utf-8
 set PYTHONUNBUFFERED=1
 set LOG=data\crawl.log
 
-rem Smallest sites first, so most sources are in the corpus early.
-for %%S in (pen daglu bi e-ska lpei beacukai jdih-kemenkeu) do (
+rem Vietnam first while its corpus is new; then the Indonesian sites, smallest
+rem first, which by now only re-check their listings for new pages.
+for %%S in (cong-bao pen daglu bi e-ska lpei beacukai jdih-kemenkeu) do (
     echo ===== !date! !time!  %%S pass 1 ===== >> %LOG%
     .venv\Scripts\python.exe main.py crawl --site %%S --full --no-ingest >> %LOG% 2>&1
     echo ===== !date! !time!  %%S pass 2 ===== >> %LOG%

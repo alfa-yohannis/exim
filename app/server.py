@@ -22,7 +22,7 @@ import subprocess
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -36,6 +36,7 @@ from .conversations import CONVERSATION_STORE
 from .embeddings import ComputeDeviceResolver
 from .extractors import EXTRACTOR_REGISTRY
 from .ingestion import AUTOMATIC_INGESTION, INGESTION_RUNNER, TEXT_EMBEDDER, AutomaticIngestion
+from .query_rewriting import QUERY_REWRITER
 from .rag import LANGUAGE_MODEL_FACTORY, QuestionRequest, RagEngine
 from .retrieval import CROSS_ENCODER_RERANKER, HybridRetriever
 from .safety import SOURCE_GUARD
@@ -55,11 +56,16 @@ class AskPayload(BaseModel):
     """Body of a question submitted to the streaming answer endpoint."""
 
     question: str = Field(min_length=1, max_length=4000)
+    #: Country whose rules the question is about: a top-level corpus folder.
+    #: The question is restated in that country's language and searched only
+    #: in its documents.
     folder_filter: str | None = None
     backend_name: str | None = None
     passage_count: int | None = Field(default=None, ge=1, le=20)
     #: Conversation to continue. Omitted for a one-off question that is not saved.
     session_id: str | None = Field(default=None, max_length=64)
+    #: Interface language, which the answer is written in.
+    language: Literal["id", "en", "vi"] = "id"
 
 
 class SessionCreatePayload(BaseModel):
@@ -195,6 +201,7 @@ class RagWebApplication:
             retriever=self._retriever,
             model_factory=LANGUAGE_MODEL_FACTORY,
             conversation_store=CONVERSATION_STORE,
+            query_rewriter=QUERY_REWRITER,
         )
 
         self.api = FastAPI(
@@ -497,6 +504,7 @@ class RagWebApplication:
             backend_name=payload.backend_name or None,
             passage_count=payload.passage_count,
             session_id=payload.session_id or None,
+            language=payload.language,
         )
         job = self._answer_jobs.start(self._engine.stream_answer(request))
         return self._build_stream_response(

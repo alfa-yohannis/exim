@@ -217,7 +217,7 @@ p { margin: 0; }
 }
 
 .brand { display: inline-flex; align-items: center; gap: 10px; }
-.brand-mark { color: var(--navy); }
+.brand-mark { color: var(--navy); flex-shrink: 0; }
 /* Name over descriptor, stacked so the lockup stays narrow enough for a phone. */
 .brand-text {
   display: flex;
@@ -239,6 +239,46 @@ p { margin: 0; }
   transition: color 140ms ease;
 }
 .nav-links a:hover { color: var(--ink); }
+
+/* Interface language: three small toggles, the active one filled. */
+.language-switcher {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+.language-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 34px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-3);
+  font: 600 12px/1 var(--font-body);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.language-option:hover { color: var(--ink); }
+.language-option[aria-pressed="true"] { background: var(--navy); color: #fff; }
+.language-option:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.language-flag {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 18px;
+  height: 12px;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+/* On the filled button a light edge keeps a flag's white half distinct. */
+.language-option[aria-pressed="true"] .language-flag { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4); }
+.language-flag svg { display: block; width: 100%; height: 100%; }
 
 /* ----------------------------------------------------------------- hero */
 
@@ -740,6 +780,9 @@ p { margin: 0; }
   font-weight: 700;
   letter-spacing: -0.035em;
   text-wrap: balance;
+  /* "dipertanggungjawabkan" alone is wider than the narrowest phones. */
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 /* Features */
@@ -1044,9 +1087,16 @@ p { margin: 0; }
   .security { grid-template-columns: 1fr; gap: 40px; }
 }
 
-@media (max-width: 760px) {
+/* The section links give way first: beside the language toggles and the
+   signed-in "Buka Aplikasi →" they no longer fit on one line below this
+   width, in Vietnamese, the longest of the three. */
+@media (max-width: 1040px) {
   .nav-links { display: none; }
-  .nav-inner { justify-content: space-between; }
+  .nav-inner { justify-content: space-between; gap: 10px; }
+}
+
+@media (max-width: 760px) {
+  .language-option { min-width: 28px; padding: 5px 6px; }
   .hero { padding-top: 32px; }
   .hero-lede { font-size: 17px; }
   .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 0; }
@@ -1060,4 +1110,30 @@ p { margin: 0; }
   .role-card { padding: 24px; }
   .cta-inner { padding: 56px 20px; border-radius: 22px; }
   .hero-actions .btn { flex: 1 1 auto; }
+}
+
+/* On a phone the nav narrows in steps, each measured against the widest
+   button, the signed-in "Open app →": first the language toggles show their
+   flags alone (the codes stay in each button's name for screen readers), then
+   the name gives way, as the hero right below repeats it, and on the
+   narrowest screens the spacing tightens. */
+@media (max-width: 550px) {
+  .language-option { min-width: 0; padding: 5px 4px; }
+  .language-code {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .brand-text { display: none; }
+}
+
+@media (max-width: 360px) {
+  .nav-inner { gap: 6px; }
+  .nav-inner .btn-small { padding-inline: 12px; }
 }

@@ -6,6 +6,8 @@
      OverviewStats     live index figures with a count-up
      AnswerDemo        types the sample answer once it scrolls into view
      ScrollEffects     sticky-nav tint and on-scroll reveals
+
+   Text comes from i18n.js, loaded first, in the language the visitor chose.
    ========================================================================== */
 
 'use strict';
@@ -18,7 +20,9 @@ const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)
 async function readJson(response) {
   const parsed = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(parsed.detail || `Terjadi kesalahan (HTTP ${response.status}).`);
+    const error = new Error(parsed.detail || t('landing.httpError', { status: response.status }));
+    error.status = response.status;
+    throw error;
   }
   return parsed;
 }
@@ -111,7 +115,7 @@ class SignInCard {
     this.usernameInput.setAttribute('aria-invalid', String(!username));
     this.passwordInput.setAttribute('aria-invalid', String(!password));
     if (!username || !password) {
-      this.#showError(errorElement, 'Isi nama pengguna dan kata sandi.');
+      this.#showError(errorElement, t('landing.missingFields'));
       (username ? this.passwordInput : this.usernameInput).focus();
       return;
     }
@@ -131,8 +135,18 @@ class SignInCard {
       this.passwordInput.value = '';
       this.passwordInput.setAttribute('aria-invalid', 'true');
       this.passwordInput.focus();
-      this.#showError(errorElement, error.message);
+      this.#showError(errorElement, this.#describeFailure(error));
     }
+  }
+
+  /** The server phrases its refusals in Indonesian; these two are known by status. */
+  #describeFailure(error) {
+    if (error.status === 401) return t('landing.wrongCredentials');
+    if (error.status === 429) {
+      const seconds = (error.message.match(/\d+/) || ['60'])[0];
+      return t('landing.tooManyAttempts', { seconds });
+    }
+    return error.message;
   }
 
   async #handleSignOut() {
@@ -141,7 +155,7 @@ class SignInCard {
   }
 
   #enterApplication(button) {
-    button.querySelector('.btn-label').textContent = 'Berhasil — membuka aplikasi…';
+    button.querySelector('.btn-label').textContent = t('landing.signedInOpening');
     window.location.assign('/app');
   }
 
@@ -162,7 +176,7 @@ class SignInCard {
     const reveal = this.passwordInput.type === 'password';
     this.passwordInput.type = reveal ? 'text' : 'password';
     button.setAttribute('aria-pressed', String(reveal));
-    button.setAttribute('aria-label', reveal ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
+    button.setAttribute('aria-label', t(reveal ? 'landing.hidePassword' : 'landing.showPassword'));
     this.passwordInput.focus();
   }
 
@@ -191,7 +205,7 @@ class OverviewStats {
   }
 
   #countUp(element, target) {
-    const format = (value) => Math.round(value).toLocaleString('id-ID');
+    const format = (value) => Math.round(value).toLocaleString(interfaceLanguage.locale);
     if (prefersReducedMotion || target === 0) {
       element.textContent = format(target);
       return;
@@ -208,14 +222,14 @@ class OverviewStats {
   }
 
   #relativeDate(isoText) {
-    if (!isoText) return 'belum pernah';
+    if (!isoText) return t('landing.never');
     const parsed = new Date(isoText);
     if (Number.isNaN(parsed.getTime())) return '–';
     const days = Math.floor((Date.now() - parsed.getTime()) / 86_400_000);
-    if (days <= 0) return 'Hari ini';
-    if (days === 1) return 'Kemarin';
-    if (days < 7) return `${days} hari lalu`;
-    return parsed.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (days <= 0) return t('landing.today');
+    if (days === 1) return t('landing.yesterday');
+    if (days < 7) return t('landing.daysAgo', { days });
+    return parsed.toLocaleDateString(interfaceLanguage.locale, { day: 'numeric', month: 'short', year: 'numeric' });
   }
 }
 
@@ -320,6 +334,9 @@ class ScrollEffects {
 /* -------------------------------------------------------------- start */
 
 document.addEventListener('DOMContentLoaded', async function startLandingPage() {
+  // Before anything reads the page: the answer demo captures its text to type it out.
+  interfaceLanguage.apply();
+  interfaceLanguage.renderSwitchers();
   document.getElementById('footer-year').textContent = String(new Date().getFullYear());
 
   new ScrollEffects().start();

@@ -42,6 +42,9 @@ class CrossEncoderReranker:
         self._model = None
         self._load_attempted = False
         self._load_lock = threading.Lock()
+        #: Two visitors asking at once would share the model's fast tokenizer,
+        #: which fails with "Already borrowed" when used from two threads.
+        self._use_lock = threading.Lock()
         self._unavailable_reason: str | None = None
 
     @property
@@ -62,31 +65,41 @@ class CrossEncoderReranker:
         return self._unavailable_reason
 
     def load(self) -> None:
-        """Load the cross-encoder once, recording failure rather than raising."""
-        if self._model is not None or self._load_attempted:
+        """Load the cross-encoder once, recording failure rather than raising.
+
+        A question arriving while another is still loading the model waits
+        for it. Returning at once, as this did until 29 September 2026, sent
+        that question on unranked: two visitors asking just after a restart
+        meant one of them got passages in raw fusion order.
+        """
+        if self._model is not None or self._unavailable_reason is not None:
             return
         with self._load_lock:
             if self._model is not None or self._load_attempted:
                 return
             self._load_attempted = True
             try:
-                from sentence_transformers import CrossEncoder
-
                 device = self._device_resolver.resolve(self._settings.reranking_device)
                 LOGGER.info(
                     "Memuat model reranking %s pada %s",
                     self._settings.reranking_model_name,
                     device,
                 )
-                self._model = CrossEncoder(
-                    self._settings.reranking_model_name,
-                    device=device,
-                    max_length=512,
-                    cache_folder=str(self._settings.model_cache_directory),
-                )
+                self._model = self._build_model(device)
             except Exception as error:
                 self._unavailable_reason = f"Gagal memuat model reranking: {error}"
                 LOGGER.warning(self._unavailable_reason)
+
+    def _build_model(self, device: str):
+        """Create the cross-encoder on ``device``."""
+        from sentence_transformers import CrossEncoder
+
+        return CrossEncoder(
+            self._settings.reranking_model_name,
+            device=device,
+            max_length=512,
+            cache_folder=str(self._settings.model_cache_directory),
+        )
 
     def rerank(
         self, question: str, candidates: list[RetrievedPassage], keep_count: int
@@ -110,9 +123,10 @@ class CrossEncoderReranker:
             question_passage_pairs = [
                 (question, candidate.text) for candidate in candidates
             ]
-            scores = self._model.predict(
-                question_passage_pairs, show_progress_bar=False, batch_size=8
-            )
+            with self._use_lock:
+                scores = self._model.predict(
+                    question_passage_pairs, show_progress_bar=False, batch_size=8
+                )
         except Exception as error:
             LOGGER.warning("Reranking gagal, memakai urutan awal: %s", error)
             return candidates[:keep_count]

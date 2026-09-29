@@ -6,10 +6,12 @@ into a numbered context block, stream an answer from the configured language
 model, and hand back the citations that back it up.
 
 The prompt in :class:`PromptBuilder` is written in Indonesian and is deliberately
-strict about grounding. Accreditation work is audited, so an answer that quietly
-invents a decree number is worse than no answer at all — the model is instructed
-to say when the corpus does not contain something, and to quote identifiers
-verbatim rather than paraphrase them.
+strict about grounding. Trade rules are enforced at the border, so an answer
+that quietly invents a regulation number is worse than no answer at all — the
+model is instructed to say when the corpus does not contain something, and to
+quote identifiers verbatim rather than paraphrase them. The answer itself is
+written in the language the interface is set to: Indonesian, English, or
+Vietnamese.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from .config import SETTINGS, Settings
 from .conversations import ChatTurn, ConversationStore
 from .documents import ExternalLinkExtractor, RetrievedPassage
 from .language_models import LanguageModelFactory
+from .query_rewriting import CountryQueryRewriter, trade_direction
 from .retrieval import HybridRetriever
 
 LOGGER = logging.getLogger(__name__)
@@ -42,6 +45,9 @@ class QuestionRequest:
     #: Conversation to continue and record this exchange in, or None for a
     #: one-off question that is not saved.
     session_id: str | None = None
+    #: Language the interface is set to, and the answer is written in:
+    #: ``id``, ``en`` or ``vi``.
+    language: str = "id"
 
 
 @dataclass
@@ -98,29 +104,45 @@ class PromptBuilder:
     budget so a long retrieval can never overflow the model's context window.
     """
 
+    #: The answer language, named inside the Indonesian instructions, and the
+    #: same instruction in that language, which a small model follows more
+    #: reliably than a request made in another language.
+    ANSWER_LANGUAGES = {
+        "id": ("Bahasa Indonesia", "Jawab dalam Bahasa Indonesia."),
+        "en": ("bahasa Inggris (English)", "Answer in English."),
+        "vi": ("bahasa Vietnam (Tiếng Việt)", "Trả lời bằng tiếng Việt."),
+    }
+
     SYSTEM_PROMPT = (
-        "Anda adalah asisten informasi ekspor-impor Indonesia. Sumber Anda adalah "
-        "salinan halaman dan dokumen publik situs pemerintah terkait ekspor-impor, "
-        "antara lain Direktorat Jenderal Bea dan Cukai (beacukai.go.id): prosedur "
-        "impor dan ekspor, larangan dan pembatasan, tarif dan kurs, fasilitas "
-        "kepabeanan, keberatan dan banding, FAQ, serta layanan. Anda bukan layanan "
-        "resmi pemerintah.\n"
+        "Anda adalah asisten informasi ekspor-impor untuk Indonesia dan Vietnam. "
+        "Sumber Anda adalah salinan halaman dan dokumen publik situs pemerintah "
+        "kedua negara: di Indonesia antara lain Direktorat Jenderal Bea dan Cukai "
+        "(beacukai.go.id), JDIH Kementerian Keuangan, Kementerian Perdagangan, "
+        "Bank Indonesia, dan LPEI; di Vietnam antara lain Hải quan Việt Nam "
+        "(customs.gov.vn), Công báo, dan kementerian terkait. Lokasi setiap sumber "
+        "di KONTEKS diawali nama negaranya. Anda bukan layanan resmi pemerintah.\n"
         "\n"
         "ATURAN MENJAWAB:\n"
         "1. Jawab HANYA berdasarkan KONTEKS yang diberikan. Jangan menambahkan "
         "pengetahuan dari luar konteks tersebut.\n"
-        "2. Sertakan sitasi [n] pada setiap pernyataan faktual, merujuk nomor "
-        "sumber di KONTEKS. Boleh lebih dari satu, misalnya [1][3].\n"
-        "3. Jika KONTEKS tidak memuat jawabannya, nyatakan dengan jelas: "
-        "\"Informasi tersebut tidak ditemukan pada dokumen yang terindeks.\" "
+        # Concrete numbers only: shown a placeholder "[n]", the model wrote
+        # "[n2]" on 30 September 2026, which the interface cannot link.
+        "2. Sertakan sitasi pada setiap pernyataan faktual: nomor sumber di "
+        "KONTEKS dalam kurung siku, misalnya [2]. Boleh lebih dari satu, "
+        "misalnya [1][3]. Di dalam kurung hanya angka, tanpa huruf atau kata.\n"
+        "3. Jika KONTEKS tidak memuat jawabannya, nyatakan dengan jelas bahwa "
+        "informasi tersebut tidak ditemukan pada dokumen yang terindeks. "
         "Kemudian sarankan di mana informasi itu mungkin tersedia, misalnya "
-        "contact center Bravo Bea Cukai 1500225, kantor bea cukai setempat, atau "
-        "instansi penerbit izin yang terkait.\n"
+        "contact center Bravo Bea Cukai 1500225 atau kantor bea cukai setempat "
+        "untuk Indonesia, kantor hải quan setempat untuk Vietnam, atau instansi "
+        "penerbit izin yang terkait.\n"
         "4. Untuk tarif, angka, tanggal, nomor peraturan, pasal, dan ayat: kutip "
         "PERSIS seperti tertulis pada sumber. Jangan membulatkan, menerjemahkan, "
         "atau menyingkat. Sebutkan nomor peraturan yang menjadi dasarnya.\n"
-        "5. Gunakan Bahasa Indonesia yang formal dan ringkas. Jika pertanyaan "
-        "diajukan dalam bahasa lain, jawab dalam bahasa pertanyaan tersebut.\n"
+        "5. Tulis jawaban dalam {language} yang formal dan ringkas, apa pun bahasa "
+        "pertanyaan dan dokumen sumbernya. Terjemahkan isi sumber berbahasa lain, "
+        "tetapi tulis nomor peraturan, nama dokumen resmi, dan angka persis seperti "
+        "sumbernya.\n"
         "6. Bila sumber-sumber saling bertentangan, tunjukkan perbedaannya "
         "beserta sitasi masing-masing, jangan memilih salah satu secara diam-diam.\n"
         "7. Sumber bertanda (OCR) berasal dari pemindaian dan mungkin mengandung "
@@ -132,32 +154,103 @@ class PromptBuilder:
         "9. Bila peraturan-peraturan di KONTEKS saling mengubah atau mencabut, "
         "utamakan yang terbaru dan sebutkan bahwa ketentuan lama telah diubah. "
         "Untuk keputusan atas kasus tertentu, sarankan konfirmasi ke kantor bea "
-        "cukai atau instansi terkait."
+        "cukai atau instansi terkait di negara yang bersangkutan.\n"
+        "10. Bila pertanyaan menyangkut dua negara, misalnya ekspor dari Indonesia "
+        "ke Vietnam, pisahkan ketentuan negara asal dan negara tujuan, dan "
+        "sebutkan negara pada setiap ketentuan."
     )
 
     #: Shown when retrieval returns nothing, instead of calling the model.
-    EMPTY_RESULT_MESSAGE = (
-        "Informasi tersebut tidak ditemukan pada dokumen yang terindeks.\n\n"
-        "Saran:\n"
-        "- Periksa ejaan atau gunakan istilah lain (misalnya singkatan resmi seperti "
-        "PIB, PEB, HS, KITE, TPB).\n"
-        "- Hapus filter folder jika sedang aktif.\n"
-        "- Pastikan proses indexing sudah dijalankan dan selesai."
-    )
+    EMPTY_RESULT_MESSAGES = {
+        "id": (
+            "Informasi tersebut tidak ditemukan pada dokumen yang terindeks.\n\n"
+            "Saran:\n"
+            "- Periksa ejaan atau gunakan istilah lain (misalnya singkatan resmi "
+            "seperti PIB, PEB, HS, KITE, TPB).\n"
+            "- Bila yang ditanyakan aturan negara lain, pilih negara itu di "
+            "\"Aturan negara\".\n"
+            "- Pastikan proses indexing sudah dijalankan dan selesai."
+        ),
+        "en": (
+            "That information was not found in the indexed documents.\n\n"
+            "Suggestions:\n"
+            "- Check the spelling or try other terms, such as official abbreviations "
+            "(PIB, PEB, HS, KITE, TPB).\n"
+            "- If you are asking about another country's rules, choose that country "
+            "under \"Rules of\".\n"
+            "- Make sure indexing has been run and has finished."
+        ),
+        "vi": (
+            "Không tìm thấy thông tin này trong các tài liệu đã lập chỉ mục.\n\n"
+            "Gợi ý:\n"
+            "- Kiểm tra chính tả hoặc dùng thuật ngữ khác, chẳng hạn các từ viết tắt "
+            "chính thức (HS, C/O, PIB, PEB).\n"
+            "- Nếu bạn hỏi về quy định của nước khác, hãy chọn nước đó ở mục "
+            "\"Quy định của\".\n"
+            "- Đảm bảo quá trình lập chỉ mục đã chạy xong."
+        ),
+    }
+
+    #: Stream messages the interface shows while it waits, by language.
+    STATUS_MESSAGES = {
+        "restating": {
+            "id": "Menyiapkan pencarian di aturan {country}...",
+            "en": "Preparing the search in {country}'s rules...",
+            "vi": "Đang chuẩn bị tìm trong quy định của {country}...",
+        },
+        "composing": {
+            "id": "Menyusun jawaban dengan {backend} ({model})...",
+            "en": "Writing the answer with {backend} ({model})...",
+            "vi": "Đang soạn câu trả lời bằng {backend} ({model})...",
+        },
+        "search_failed": {
+            "id": "Pencarian gagal: {error}",
+            "en": "Search failed: {error}",
+            "vi": "Tìm kiếm thất bại: {error}",
+        },
+        "model_failed": {
+            "id": "Model bahasa gagal ({backend}): {error}",
+            "en": "The language model failed ({backend}): {error}",
+            "vi": "Mô hình ngôn ngữ gặp lỗi ({backend}): {error}",
+        },
+    }
 
     def __init__(self, settings: Settings) -> None:
         """Bind the builder to the configured context budget."""
         self._settings = settings
 
-    def build_system_prompt(self) -> str:
+    @classmethod
+    def supported_language(cls, language: str | None) -> str:
+        """Return ``language`` if an answer can be written in it, else Indonesian."""
+        return language if language in cls.ANSWER_LANGUAGES else "id"
+
+    def build_system_prompt(self, language: str = "id") -> str:
         """Return the grounding instructions given to every backend."""
-        return self.SYSTEM_PROMPT
+        language_name, _ = self.ANSWER_LANGUAGES[self.supported_language(language)]
+        return self.SYSTEM_PROMPT.replace("{language}", language_name)
+
+    def empty_result_message(self, language: str = "id") -> str:
+        """Return the not-found answer in ``language``."""
+        return self.EMPTY_RESULT_MESSAGES[self.supported_language(language)]
+
+    def status_message(self, name: str, language: str = "id", **values: str) -> str:
+        """Return one stream message in ``language``, with ``values`` filled in."""
+        return self.STATUS_MESSAGES[name][self.supported_language(language)].format(**values)
+
+    #: Country names that differ from the corpus folder name, by language.
+    COUNTRY_NAMES = {"Vietnam": {"vi": "Việt Nam"}}
+
+    def country_name(self, country: str, language: str = "id") -> str:
+        """Return the corpus folder ``country`` as a reader of ``language`` writes it."""
+        return self.COUNTRY_NAMES.get(country, {}).get(self.supported_language(language), country)
 
     def build_user_prompt(
         self,
         question: str,
         passages: list[RetrievedPassage],
         history: list[ChatTurn] | None = None,
+        language: str = "id",
+        country: str | None = None,
     ) -> str:
         """Return the conversation so far, the numbered context, and the question.
 
@@ -179,11 +272,32 @@ class PromptBuilder:
             "=======\n"
             f"{self._render_context(passages)}"
         )
+        language_name, instruction = self.ANSWER_LANGUAGES[self.supported_language(language)]
+        if country:
+            # The reader chose whose rules they are asking about; the context
+            # holds only that country's documents, and the answer stays there.
+            side = {
+                "import": f" Barang dalam pertanyaan masuk ke {country}, jadi yang "
+                          f"ditanyakan adalah ketentuan impor {country}.",
+                "export": f" Barang dalam pertanyaan keluar dari {country}, jadi yang "
+                          f"ditanyakan adalah ketentuan ekspor {country}.",
+            }.get(trade_direction(question, country), "")
+            sections.append(
+                "NEGARA\n"
+                "======\n"
+                f"Pengguna bertanya tentang aturan {country}.{side} Jawab hanya tentang "
+                f"ketentuan {country}; jangan menambahkan ketentuan negara lain. Bila "
+                f"yang ditanyakan menyangkut negara lain, sebutkan bahwa jawabannya "
+                f"perlu dicari dengan memilih negara itu."
+            )
         sections.append(
             "PERTANYAAN\n"
             "==========\n"
             f"{question}\n\n"
-            "Jawab sesuai aturan di atas, dengan sitasi [n]."
+            # Concrete numbers, not "[n]": placed last, a placeholder was copied
+            # into an answer verbatim on 29 September 2026.
+            f"Jawab sesuai aturan di atas, dengan nomor sumber sebagai sitasi, misalnya "
+            f"[1] atau [2][3], dalam {language_name}. {instruction}"
         )
         return "\n\n".join(sections)
 
@@ -288,16 +402,19 @@ class RagEngine:
         retriever: HybridRetriever,
         model_factory: LanguageModelFactory,
         conversation_store: ConversationStore | None = None,
+        query_rewriter: CountryQueryRewriter | None = None,
     ) -> None:
         """Wire the engine to retrieval, the backend factory and chat storage.
 
         ``conversation_store`` is optional so the engine can be exercised — and
         used for one-off command-line questions — without persisting anything.
+        Without ``query_rewriter``, questions are searched as typed.
         """
         self._settings = settings
         self._retriever = retriever
         self._model_factory = model_factory
         self._conversation_store = conversation_store
+        self._query_rewriter = query_rewriter
         self._prompt_builder = PromptBuilder(settings)
         self._query_expander = FollowUpQueryExpander(settings)
         self._link_extractor = ExternalLinkExtractor()
@@ -317,22 +434,42 @@ class RagEngine:
         if search_query != request.question:
             LOGGER.info("Pertanyaan lanjutan diperluas untuk pencarian: %r", search_query)
 
+        # One country's documents are searched in that country's language and
+        # from its side of the trade: see app.query_rewriting.
+        country = request.folder_filter
+        restated_query = None
+        if self._query_rewriter is not None and self._query_rewriter.supports(country):
+            yield StreamEvent("status", {"message": self._prompt_builder.status_message(
+                "restating", request.language,
+                country=self._prompt_builder.country_name(country, request.language),
+            )})
+            rewritten = self._query_rewriter.rewrite(search_query, country)
+            if rewritten != search_query:
+                restated_query = search_query = rewritten
+
         try:
             passages = self._retriever.retrieve(
                 search_query, request.folder_filter, request.passage_count
             )
         except Exception as error:
             LOGGER.exception("Pencarian gagal")
-            yield StreamEvent("error", {"message": f"Pencarian gagal: {error}"})
+            message = self._prompt_builder.status_message(
+                "search_failed", request.language, error=str(error)
+            )
+            yield StreamEvent("error", {"message": message})
             yield StreamEvent("done", {"elapsed_seconds": round(time.time() - started_at, 2)})
             return
 
         citations = self._build_citations(passages)
         citation_payload = [item.as_dictionary() for item in citations]
-        yield StreamEvent("sources", {"citations": citation_payload})
+        sources_payload: dict = {"citations": citation_payload}
+        if restated_query:
+            # Shown beside the answer, so the reader can see what was searched.
+            sources_payload.update({"search_query": restated_query, "country": country})
+        yield StreamEvent("sources", sources_payload)
 
         if not passages:
-            message = self._prompt_builder.EMPTY_RESULT_MESSAGE
+            message = self._prompt_builder.empty_result_message(request.language)
             self._record_answer(request, message, [], "", "", time.time() - started_at)
             yield StreamEvent("token", {"text": message})
             yield StreamEvent(
@@ -366,13 +503,18 @@ class RagEngine:
             yield StreamEvent("done", {"elapsed_seconds": round(time.time() - started_at, 2)})
             return
 
-        system_prompt = self._prompt_builder.build_system_prompt()
+        system_prompt = self._prompt_builder.build_system_prompt(request.language)
         user_prompt = self._prompt_builder.build_user_prompt(
-            request.question, passages, history
+            request.question, passages, history, request.language, request.folder_filter
         )
         yield StreamEvent(
             "status",
-            {"message": f"Menyusun jawaban dengan {backend.name} ({backend.model_name})..."},
+            {
+                "message": self._prompt_builder.status_message(
+                    "composing", request.language,
+                    backend=backend.name, model=backend.model_name,
+                )
+            },
         )
 
         token_count = 0
@@ -386,10 +528,10 @@ class RagEngine:
                 yield StreamEvent("token", {"text": text_fragment})
         except Exception as error:
             LOGGER.exception("Backend model bahasa gagal")
-            yield StreamEvent(
-                "error",
-                {"message": f"Model bahasa gagal ({backend.name}): {error}"},
+            message = self._prompt_builder.status_message(
+                "model_failed", request.language, backend=backend.name, error=str(error)
             )
+            yield StreamEvent("error", {"message": message})
 
         elapsed = time.time() - started_at
         # Stored even when generation failed part-way: a partial answer with its

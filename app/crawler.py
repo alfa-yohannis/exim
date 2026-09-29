@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
-from urllib.parse import unquote, urljoin, urlparse
+from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 from .config import SETTINGS, Settings
 from .safety import SOURCE_GUARD, SourceTreeGuard
@@ -77,6 +77,15 @@ class CrawlSection:
     #: most documents arrive early and a file over the size limit is never
     #: downloaded at all.
     smallest_attachments_first: bool = False
+    #: Address of a listing's later pages, for sites that number pages in the
+    #: path instead of a query: ``{stem}/trang-{number}.htm``, where ``{stem}``
+    #: is the listing address without its extension and ``{number}`` counts
+    #: from 2. Empty means the site's page query parameter.
+    page_url_template: str = ""
+    #: Regex a listing link's text must match to be followed. It picks the few
+    #: documents that matter out of a list of everything an office publishes,
+    #: before any of them is fetched.
+    link_text_pattern: str = ""
 
 
 @dataclass(frozen=True)
@@ -85,7 +94,10 @@ class CrawlSite:
 
     #: Name on the command line: ``main.py crawl --site beacukai``.
     key: str
-    #: Top-level corpus folder, which doubles as the interface's folder filter.
+    #: Country whose rules the site publishes. It is the top-level corpus
+    #: folder, which doubles as the interface's folder filter.
+    country: str
+    #: The site's folder inside its country's folder.
     folder: str
     #: Canonical origin every page URL is rewritten to.
     root: str
@@ -117,9 +129,13 @@ class CrawlSite:
     attachment_hosts: frozenset[str] = frozenset()
     #: Path regexes marking download links that carry no file extension.
     attachment_path_patterns: tuple[str, ...] = ()
-    #: Path regexes of downloads never taken, such as an abstract published
-    #: beside the full text.
+    #: Regexes on the path, and any query, of downloads never taken, such as an
+    #: abstract published beside the full text.
     attachment_exclude_patterns: tuple[str, ...] = ()
+    #: File types in order of preference, for pages that offer one document in
+    #: several: a DOCX and a PDF of the same text. Only the first type present
+    #: is taken, so the text is indexed once; types not listed are not taken.
+    attachment_preference: tuple[str, ...] = ()
     #: Query parameter a paginated listing takes, counted from 0.
     page_parameter: str = "page"
 
@@ -183,11 +199,31 @@ class SiteUrl:
         )
 
     def is_wanted_attachment(self, url: str) -> bool:
-        """True when ``url`` is a document file the site's plan does not exclude."""
-        path = urlparse(url).path
+        """True when ``url`` is a document file the site's plan does not exclude.
+
+        Exclusions see the query too, because some file servers name the file
+        there: ``/api/download/stream?…&file_name=…pdf``.
+        """
+        parsed = urlparse(url)
+        target = f"{parsed.path}?{parsed.query}" if parsed.query else parsed.path
         return self.is_attachment(url) and not any(
-            pattern.search(path) for pattern in self._excluded_attachments
+            pattern.search(target) for pattern in self._excluded_attachments
         )
+
+    @staticmethod
+    def file_name_of(url: str) -> str:
+        """Return the file name a download link gives, in its query or else its path.
+
+        Some file servers name the file in the query:
+        ``/api/download/stream?…&file_name=2026_523_136%2F2026%2FTT-BTC.docx``.
+        """
+        parsed = urlparse(url)
+        named = next(
+            (values[0] for key, values in parse_qs(parsed.query).items()
+             if key.lower() in ("file_name", "filename") and values),
+            "",
+        )
+        return named.strip() or unquote(Path(parsed.path).name)
 
     def with_page(self, url: str, page_number: int) -> str:
         """Return ``url`` asking for one page of a paginated listing."""
@@ -203,6 +239,9 @@ class ParsedPage:
     text: str
     links: list[str] = field(default_factory=list)
     attachments: list[tuple[str, str]] = field(default_factory=list)
+    #: The text of every anchor pointing at each link, joined, so a listing
+    #: can be filtered by the titles it shows.
+    link_texts: dict[str, str] = field(default_factory=dict)
 
 
 class PageParser:
@@ -239,7 +278,7 @@ class PageParser:
         # A listing's entries can sit in a block beside the main one, so when
         # the site names a link region, links are read before anything is removed.
         region = self._first(soup, self._site.link_region_selectors)
-        links = self._links_in(region, url) if region is not None else None
+        labelled_links = self._labelled_links_in(region, url) if region is not None else None
 
         content = self._first(soup, self._site.content_selectors) or soup
         for tag_name in WebPageReader.NON_CONTENT_TAGS:
@@ -257,15 +296,44 @@ class PageParser:
                 if child.get_text(" ", strip=True).startswith(self._site.boilerplate_prefixes):
                     child.decompose()
 
-        if links is None:
-            links = self._links_in(content, url)
-        attachments = [
+        if labelled_links is None:
+            labelled_links = self._labelled_links_in(content, url)
+        link_texts: dict[str, str] = {}
+        for label, link in labelled_links:
+            if label:
+                link_texts[link] = f"{link_texts[link]} | {label}" if link in link_texts else label
+        attachments = self._preferred_versions([
             (label, link) for label, link in self._labelled_links_in(content, url)
             if self._urls.is_wanted_attachment(link)
-        ]
+        ])
         return ParsedPage(
-            title=title, text=self._readable_text(content), links=links, attachments=attachments
+            title=title,
+            text=self._readable_text(content),
+            links=list(dict.fromkeys(link for _label, link in labelled_links)),
+            attachments=attachments,
+            link_texts=link_texts,
         )
+
+    def _preferred_versions(self, attachments: list[tuple[str, str]]) -> list[tuple[str, str]]:
+        """Keep one file per document where the site lists its preferred types.
+
+        The Vietnamese gazette offers each document as DOCX and PDF, but older
+        ones as a legacy DOC, which no extractor reads, and PDF: the DOCX is
+        taken when there is one, the PDF otherwise.
+        """
+        order = [suffix.lower() for suffix in self._site.attachment_preference]
+        if not order:
+            return attachments
+        chosen: dict[str, tuple[int, tuple[str, str]]] = {}
+        for label, link in attachments:
+            stem, dot, suffix = self._urls.file_name_of(link).rpartition(".")
+            extension = f".{suffix.lower()}"
+            if not dot or extension not in order:
+                continue
+            rank = order.index(extension)
+            if stem not in chosen or rank < chosen[stem][0]:
+                chosen[stem] = (rank, (label, link))
+        return [attachment for _rank, attachment in chosen.values()]
 
     def _first(self, soup, selectors: tuple[str, ...]):
         """Return the element matching the first selector that matches anything."""
@@ -310,10 +378,6 @@ class PageParser:
             title = heading.get_text(" ", strip=True) if heading else title
         return title or "Halaman"
 
-    def _links_in(self, element, base_url: str) -> list[str]:
-        """Return the unique normalised links inside ``element``, in page order."""
-        return list(dict.fromkeys(link for _label, link in self._labelled_links_in(element, base_url)))
-
     def _labelled_links_in(self, element, base_url: str) -> list[tuple[str, str]]:
         """Return ``(anchor text, normalised URL)`` for each fetchable link."""
         found: list[tuple[str, str]] = []
@@ -341,6 +405,10 @@ class PoliteFetcher:
         "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
     }
 
+    #: Intermediate certificates some government servers leave out of the
+    #: chain they send. Browsers fetch those themselves; requests cannot.
+    EXTRA_CERTIFICATES = Path(__file__).with_name("certificates") / "intermediates.pem"
+
     def __init__(self, settings: Settings) -> None:
         """Open a session carrying browser-like headers."""
         import requests
@@ -348,7 +416,28 @@ class PoliteFetcher:
         self._settings = settings
         self._session = requests.Session()
         self._session.headers.update(WebPageReader.BROWSER_HEADERS)
+        self._session.verify = self._certificate_bundle()
         self._last_request_at = 0.0
+
+    def _certificate_bundle(self) -> str | bool:
+        """Return certifi's roots plus the missing intermediates, as one file.
+
+        requests takes a single bundle, so the two are joined into the data
+        directory; the file is rewritten only when either part changes.
+        """
+        import certifi
+
+        if not self.EXTRA_CERTIFICATES.exists():
+            return True
+        combined = (
+            Path(certifi.where()).read_text(encoding="utf-8") + "\n"
+            + self.EXTRA_CERTIFICATES.read_text(encoding="utf-8")
+        )
+        bundle = Path(self._settings.data_directory) / "crawl-ca-bundle.pem"
+        if not bundle.exists() or bundle.read_text(encoding="utf-8") != combined:
+            bundle.parent.mkdir(parents=True, exist_ok=True)
+            bundle.write_text(combined, encoding="utf-8")
+        return str(bundle)
 
     def get_text(self, url: str) -> str:
         """Return the HTML of ``url``.
@@ -423,7 +512,10 @@ class PoliteFetcher:
         """
         disposition = response.headers.get("Content-Disposition", "")
         match = re.search(r"filename\*?=(?:UTF-8'')?\"?([^\";]+)\"?", disposition, re.IGNORECASE)
-        name = unquote(match.group(1)).strip() if match else unquote(Path(urlparse(url).path).name)
+        name = unquote(match.group(1)).strip() if match else SiteUrl.file_name_of(url)
+        # A regulation number such as "136/2026/TT-BTC" is part of the name,
+        # not a folder: kept as slashes, only "TT-BTC" would survive.
+        name = name.replace("/", "-").replace("\\", "-")
         suffix = Path(name).suffix.lower()
         if suffix in SiteUrl.ATTACHMENT_EXTENSIONS:
             return name
@@ -470,7 +562,7 @@ class PoliteFetcher:
 
 
 class CorpusPageWriter(SnapshotWriter):
-    """Writes crawled pages and attachments into ``SOURCE_DIR/<site>/<section>/``.
+    """Writes crawled pages and attachments into ``SOURCE_DIR/<country>/<site>/<section>/``.
 
     The snapshot format is inherited unchanged: a provenance header and a
     source marker repeated through the body, so every chunk carries its URL.
@@ -486,7 +578,9 @@ class CorpusPageWriter(SnapshotWriter):
 
     def section_directory(self, section: CrawlSection) -> Path:
         """Return (creating it) the folder one section is written to."""
-        directory = self._inside_corpus(self._directory / self._site.folder / section.folder)
+        directory = self._inside_corpus(
+            self._directory / self._site.country / self._site.folder / section.folder
+        )
         directory.mkdir(parents=True, exist_ok=True)
         return directory
 
@@ -806,7 +900,7 @@ class SiteCrawler:
             if limit == 0:
                 break
             for detail_url in self._walk_listing(
-                listing_url, detail_pattern, section.paginate, limit, fetcher, parser, urls
+                listing_url, section, detail_pattern, limit, fetcher, parser, urls
             ):
                 pages.setdefault(
                     detail_url, ExternalPage(url=detail_url, label=label, referenced_by=listing_url)
@@ -816,21 +910,29 @@ class SiteCrawler:
     def _walk_listing(
         self,
         listing_url: str,
+        section: CrawlSection,
         detail_pattern: re.Pattern,
-        paginate: bool,
         limit: int | None,
         fetcher: PoliteFetcher,
         parser: PageParser,
         urls: SiteUrl,
     ) -> list[str]:
-        """Follow one listing page by page until ``limit`` or the last page."""
+        """Follow one listing page by page until ``limit`` or the last page.
+
+        The last page is the first to offer no detail link not seen before.
+        That is judged before ``link_text_pattern``, so a page whose entries
+        are all out of scope does not end the walk.
+        """
+        text_pattern = (
+            re.compile(section.link_text_pattern, re.IGNORECASE) if section.link_text_pattern else None
+        )
         found: list[str] = []
         seen: set[str] = set()
         page_number = 0
         while limit is None or len(found) < limit:
-            url = urls.with_page(listing_url, page_number) if paginate else listing_url
+            url = self._listing_page_url(listing_url, section, page_number, urls)
             try:
-                links = self._listing_links(fetcher.get_text(url), url, parser, urls)
+                links, link_texts = self._listing_links(fetcher.get_text(url), url, parser, urls)
             except Exception as error:
                 LOGGER.warning("Gagal membaca daftar %s: %s", url, error)
                 break
@@ -845,22 +947,47 @@ class SiteCrawler:
             new_links = [link for link in new_links if "?" not in link]
             if not new_links:
                 break
-            found.extend(new_links)
             seen.update(new_links)
-            if not paginate:
+            found.extend(
+                link for link in new_links
+                if text_pattern is None or text_pattern.search(link_texts.get(link, ""))
+            )
+            if not section.paginate:
                 break
             page_number += 1
         return found if limit is None else found[:limit]
 
     @staticmethod
-    def _listing_links(text: str, url: str, parser: PageParser, urls: SiteUrl) -> list[str]:
-        """Return the links a listing offers: a sitemap's ``<loc>`` entries, or a page's anchors."""
+    def _listing_page_url(
+        listing_url: str, section: CrawlSection, page_number: int, urls: SiteUrl
+    ) -> str:
+        """Return the address of page ``page_number`` (from 0) of a listing."""
+        if not section.paginate:
+            return listing_url
+        if not section.page_url_template:
+            return urls.with_page(listing_url, page_number)
+        if page_number == 0:
+            return listing_url
+        suffix = Path(urlparse(listing_url).path).suffix
+        stem = listing_url[: -len(suffix)] if suffix and listing_url.endswith(suffix) else listing_url
+        return section.page_url_template.format(stem=stem, number=page_number + 1)
+
+    @staticmethod
+    def _listing_links(
+        text: str, url: str, parser: PageParser, urls: SiteUrl
+    ) -> tuple[list[str], dict[str, str]]:
+        """Return the links a listing offers, with their anchor text.
+
+        A sitemap's ``<loc>`` entries carry no text; a page's anchors do.
+        """
         if "<urlset" in text[:2000]:
             locations = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", text)
-            return list(dict.fromkeys(
+            links = list(dict.fromkeys(
                 link for link in (urls.normalise(location, url) for location in locations) if link
             ))
-        return parser.parse(text, url).links
+            return links, {}
+        parsed = parser.parse(text, url)
+        return parsed.links, parsed.link_texts
 
     def _download_attachments(
         self,

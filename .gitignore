@@ -10,6 +10,8 @@
 !.env.example
 *.key
 *.pem
+# Public intermediate certificates the crawler trusts; not secrets.
+!app/certificates/*.pem
 *credentials*.json
 *secrets*.json
 
@@ -90,6 +92,3 @@ $RECYCLE.BIN/
 *.nav
 *.snm
 *.toc
-
-
-corpus-pajak

@@ -1,9 +1,9 @@
 """The websites the corpus is built from, and how to crawl each of them.
 
-Sites are listed in the order of README "Sumber yang di-crawl": by how much of
-a typical export-import question they answer. Each :class:`CrawlSite` becomes
-one top-level corpus folder, so the interface's folder filter reads as a
-choice of source.
+Sites are grouped by country and, within a country, listed in the order of the
+README source tables: by how much of a typical export-import question they
+answer. Each :class:`CrawlSite` fills ``corpus-exim/<country>/<site>/``, so the
+interface's folder filter reads as a choice of country.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ def _beacukai_pages(*slugs: str) -> tuple[str, ...]:
 #: excise (cukai) is optional because it concerns domestic goods.
 BEA_CUKAI = CrawlSite(
     key="beacukai",
+    country="Indonesia",
     folder="Bea Cukai",
     root=_BEACUKAI_ROOT,
     hosts=frozenset({"www.beacukai.go.id", "beacukai.go.id"}),
@@ -150,6 +151,7 @@ _CUSTOMS_TITLE = (
 #: beside an abstract that repeats it and is left out.
 JDIH_KEMENKEU = CrawlSite(
     key="jdih-kemenkeu",
+    country="Indonesia",
     folder="JDIH Kemenkeu",
     root=_JDIH_KEMENKEU_ROOT,
     hosts=frozenset({"jdih.kemenkeu.go.id"}),
@@ -206,6 +208,7 @@ def _kemendag_directorate(
     root = f"https://{subdomain}.kemendag.go.id"
     return CrawlSite(
         key=key,
+        country="Indonesia",
         folder=folder,
         root=root,
         hosts=frozenset({f"{subdomain}.kemendag.go.id"}),
@@ -256,6 +259,7 @@ def _eska_pages(*slugs: str) -> tuple[str, ...]:
 #: is absent.
 E_SKA = CrawlSite(
     key="e-ska",
+    country="Indonesia",
     folder="e-SKA Kemendag",
     root=_ESKA_ROOT,
     hosts=frozenset({"e-ska.kemendag.go.id"}),
@@ -316,6 +320,7 @@ _LPEI_ROOT = "https://www.indonesiaeximbank.go.id"
 #: export risks, programmes, and villages that export. robots.txt allows all.
 LPEI = CrawlSite(
     key="lpei",
+    country="Indonesia",
     folder="LPEI",
     root=_LPEI_ROOT,
     hosts=frozenset({"www.indonesiaeximbank.go.id", "indonesiaeximbank.go.id"}),
@@ -358,6 +363,7 @@ def _bi_regulations(*names: str) -> tuple[str, ...]:
 #: and links the full text and a Q&A document, both PDFs.
 BANK_INDONESIA = CrawlSite(
     key="bi",
+    country="Indonesia",
     folder="Bank Indonesia",
     root=_BI_ROOT,
     hosts=frozenset({"www.bi.go.id", "bi.go.id"}),
@@ -388,6 +394,66 @@ BANK_INDONESIA = CrawlSite(
     ),
 )
 
+# --- Vietnam: Công báo (Official Gazette) ------------------------------------------
+
+_CONG_BAO_ROOT = "https://congbao.chinhphu.vn"
+
+#: Words in the titles of Vietnamese legal documents on customs and trade
+#: across the border: customs, export, import, origin, tariff schedules,
+#: quarantine, transit, temporary import and re-export, bonded warehouses,
+#: non-tariff zones, foreign trade, free trade, trade remedies, food safety.
+_VIETNAM_TRADE_TITLE = (
+    r"hải quan|xuất khẩu|nhập khẩu|xuất xứ|biểu thuế|kiểm dịch|quá cảnh|tạm nhập|"
+    r"tái xuất|kho ngoại quan|phi thuế quan|ngoại thương|thương mại tự do|"
+    r"phòng vệ thương mại|bán phá giá|chống trợ cấp|an toàn thực phẩm"
+)
+
+
+def _cong_bao_section(folder: str, listing_slug: str) -> CrawlSection:
+    """Return the section for one issuing office's list in the gazette."""
+    return CrawlSection(
+        folder=folder,
+        listing_urls=(f"{_CONG_BAO_ROOT}/van-ban-dang-cong-bao/{listing_slug}.htm",),
+        detail_pattern=r"^/van-ban/[a-z0-9-]+-\d+\.htm$",
+        page_url_template="{stem}/trang-{number}.htm",
+        link_text_pattern=_VIETNAM_TRADE_TITLE,
+        sample_limit_per_listing=20,
+        sample_attachment_limit=20,
+    )
+
+
+#: The Official Gazette publishes every law, decree, and circular as issued,
+#: listed per issuing office, ten to a page. A document page carries the dates
+#: and title; the text itself is a DOCX and a PDF on the government file
+#: server, which omits an intermediate certificate (see app/certificates).
+#: Titles on the lists pick the customs and trade documents before any is
+#: fetched. vbpl.vn is not used: its texts load from /api/, which its
+#: robots.txt forbids. robots.txt here allows everything.
+CONG_BAO = CrawlSite(
+    key="cong-bao",
+    country="Vietnam",
+    folder="Cong Bao",
+    root=_CONG_BAO_ROOT,
+    hosts=frozenset({"congbao.chinhphu.vn"}),
+    content_selectors=("div.box-section--main", "#main-content"),
+    # The office's own list; a "new documents" column beside it lists every office.
+    link_region_selectors=("div.box--list",),
+    attachment_hosts=frozenset({"g7.cdnchinhphu.vn"}),
+    attachment_path_patterns=(r"^/api/download/stream$",),
+    # The DOCX and the PDF hold the same text; the DOCX reads cleanly. Older
+    # documents come as a legacy DOC, which cannot be read, so their PDF is taken.
+    attachment_preference=(".docx", ".pdf"),
+    sections=(
+        _cong_bao_section("Quoc hoi", "quoc-hoi-c31"),
+        _cong_bao_section("Chinh phu", "chinh-phu-c1"),
+        _cong_bao_section("Thu tuong", "thu-tuong-chinh-phu-c2"),
+        _cong_bao_section("Bo Tai chinh", "bo-tai-chinh-c10"),
+        _cong_bao_section("Bo Cong Thuong", "bo-cong-thuong-c3"),
+        _cong_bao_section("Bo Nong nghiep va Moi truong", "bo-nong-nghiep-va-moi-truong-c167"),
+        _cong_bao_section("Bo Y te", "bo-y-te-c25"),
+    ),
+)
+
 # --- pajak.go.id (reference; its corpus already exists in corpus-pajak) --------
 
 _PAJAK_ROOT = "https://www.pajak.go.id"
@@ -400,6 +466,7 @@ def _peraturan_listing(document_type_id: str) -> str:
 
 PAJAK = CrawlSite(
     key="pajak",
+    country="Indonesia",
     folder="Pajak",
     root=_PAJAK_ROOT,
     hosts=frozenset({"www.pajak.go.id", "pajak.go.id"}),
@@ -468,5 +535,7 @@ PAJAK = CrawlSite(
 #: Every crawlable site, by its command-line key, in order of influence.
 SITES: dict[str, CrawlSite] = {
     site.key: site
-    for site in (BEA_CUKAI, JDIH_KEMENKEU, DAGLU, E_SKA, PEN, BANK_INDONESIA, LPEI, PAJAK)
+    for site in (
+        BEA_CUKAI, JDIH_KEMENKEU, DAGLU, E_SKA, PEN, BANK_INDONESIA, LPEI, PAJAK, CONG_BAO,
+    )
 }

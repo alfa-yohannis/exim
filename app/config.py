@@ -319,6 +319,14 @@ class Settings:
         #: question before retrieval, so "siapa saja mereka?" still finds documents.
         self.follow_up_word_threshold: int = reader.integer("FOLLOW_UP_WORDS", 6)
 
+        # --- Questions about one country's rules ----------------------------
+        #: Restate each question in the chosen country's language, from that
+        #: country's side of the trade, before searching its documents. Always
+        #: done by the local Ollama model, whichever backend writes the answer.
+        self.query_rewrite_enabled: bool = reader.flag("QUERY_REWRITE", True)
+        #: Seconds to wait for the restatement before searching as typed.
+        self.query_rewrite_timeout_seconds: int = reader.integer("QUERY_REWRITE_TIMEOUT", 45)
+
         # --- Optical character recognition ----------------------------------
         self.ocr_enabled: bool = reader.flag("OCR_ENABLED", False)
         #: A PDF page yielding fewer characters than this is treated as scanned.

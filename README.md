@@ -23,9 +23,9 @@ berkas dan halaman sumbernya.
 | **Pencarian** | Hibrida — vektor BGE-M3 + BM25 SQLite FTS5, digabung dengan reciprocal rank fusion, lalu dipertajam cross-encoder |
 | **Penjawab** | Qwen3 8B lokal via Ollama, atau CLI Claude Code / Codex / Antigravity |
 | **Sumber eksternal** | Salinan bertanggal SINTA (dengan login & paginasi), Google Scholar, PDDikti, dan situs kampus |
-| **Antarmuka** | Satu halaman: jawaban Markdown mengalir, sitasi dapat diklik, tautan ke sumber asli, salin ke papan klip, unduh dokumen, percakapan tersimpan |
-| **Skala saat ini** | ±2.500 berkas dari 7 situs (Bea Cukai, JDIH Kemenkeu, e-SKA, LPEI, Bank Indonesia, Ditjen Daglu, Ditjen PEN), ±59.000 potongan teks |
-| **Pengujian** | 536 pengujian unit, selesai dalam ±16 detik tanpa jaringan |
+| **Antarmuka** | Satu halaman: jawaban Markdown mengalir, sitasi dapat diklik, tautan ke sumber asli, salin ke papan klip, unduh dokumen, percakapan tersimpan. Tiga bahasa — Bahasa Indonesia, English, Tiếng Việt — dan jawaban ditulis dalam bahasa yang dipilih |
+| **Skala saat ini** | Indonesia: ±2.500 berkas dari 7 situs (Bea Cukai, JDIH Kemenkeu, e-SKA, LPEI, Bank Indonesia, Ditjen Daglu, Ditjen PEN), ±59.000 potongan teks. Vietnam: Công báo sedang di-crawl |
+| **Pengujian** | 552 pengujian unit, selesai dalam ±16 detik tanpa jaringan |
 
 ---
 
@@ -55,9 +55,10 @@ URL dan robots.txt diperiksa pada 28–29 September 2026. Crawler-nya
 di-crawl: Bea Cukai (`--site beacukai`), JDIH Kemenkeu (`jdih-kemenkeu`),
 Ditjen Daglu (`daglu`), e-SKA (`e-ska`), Ditjen PEN (`pen`), Bank Indonesia
 (`bi`), dan LPEI (`lpei`); situs lain menyusul.
-Hasilnya masuk ke `corpus-exim\<Situs>\<Bagian>\`, sehingga filter folder di
-antarmuka menjadi filter per sumber. Lihat
-[Berjalan di latar belakang](#berjalan-di-latar-belakang).
+Hasilnya masuk ke `corpus-exim\<Negara>\<Situs>\<Bagian>\`, sehingga filter
+folder di antarmuka menjadi filter per negara. Lihat
+[Berjalan di latar belakang](#berjalan-di-latar-belakang) dan
+[Korpus Vietnam](#korpus-vietnam).
 
 ### Tier 1 — Inti
 
@@ -106,6 +107,121 @@ antarmuka menjadi filter per sumber. Lihat
 
 ---
 
+## Korpus Vietnam
+
+Tujuannya menjawab pertanyaan lintas batas, misalnya "saya mau ekspor kopi
+ke Vietnam, apa langkahnya, dokumennya, dan biayanya?": sisi Indonesia sudah
+ada di korpus, sisi Vietnam (bea masuk, karantina, keamanan pangan, asal
+barang, prosedur) ditambahkan di sini. URL dan robots.txt diperiksa pada 29
+September 2026. Công báo (`--site cong-bao`) sedang di-crawl; situs lain
+menyusul.
+
+### Struktur folder
+
+Negara menjadi tingkat pertama, sehingga filter folder di antarmuka menjadi
+filter per negara dan negara ASEAN berikutnya tinggal menambah satu folder:
+
+```
+corpus-exim\
+├── Indonesia\                        tujuh situs Indonesia
+│   ├── Bea Cukai\<Bagian>\
+│   ├── JDIH Kemenkeu\<Bagian>\
+│   └── ...
+└── Vietnam\
+    ├── Hai Quan\                     customs.gov.vn — Cục Hải quan (Bộ Tài chính)
+    │   ├── Thu tuc\                  prosedur kepabeanan per jenis ekspor/impor
+    │   ├── Hoi dap\                  tanya jawab kebijakan dan prosedur
+    │   └── Bieu thue\                tarif
+    ├── Cong Bao\                     congbao.chinhphu.vn — Lembaran Negara (naskah resmi)
+    │   ├── Quoc hoi\                 undang-undang (Luật)
+    │   ├── Chinh phu\                peraturan pemerintah (Nghị định)
+    │   ├── Bo Tai chinh\             thông tư kepabeanan, tarif, asal barang
+    │   ├── Bo Cong Thuong\           thông tư izin ekspor-impor, C/O
+    │   ├── Bo Nong nghiep va Moi truong\   karantina hewan dan tumbuhan
+    │   └── Bo Y te\                  keamanan pangan impor
+    ├── Dich Vu Cong\                 dichvucong.gov.vn — langkah, dokumen, biaya, lama proses
+    ├── Bo Cong Thuong\               moit.gov.vn — văn bản, C/O, perdagangan luar negeri
+    ├── Kiem Dich\                    ppd.gov.vn, cucthuy.gov.vn — karantina
+    ├── An Toan Thuc Pham\            vfa.gov.vn — keamanan pangan
+    ├── Trung Tam WTO\                trungtamwto.vn — FTA, asal barang, profil pasar
+    └── Ngan Hang Nha Nuoc\           sbv.gov.vn — devisa
+```
+
+Nama folder memakai bahasa Vietnam tanpa diakritik, sesuai nama lembaganya,
+agar aman di semua alat; nama bagian mengikuti isi situsnya.
+
+Yang sudah disiapkan di aplikasi:
+
+1. `CrawlSite` punya `country`, dan penulis korpus menulis ke
+   `corpus-exim\<Negara>\<Situs>\<Bagian>\`.
+2. Tujuh folder Indonesia dipindah ke `corpus-exim\Indonesia\` pada 29
+   September 2026. ID dokumen mengikuti path, jadi path dan ID di indeks,
+   manifest `data\crawl-*.json`, dan sitasi percakapan tersimpan ikut
+   diganti bersamaan; tidak ada yang dibaca ulang. Cadangannya di
+   `data\backup-sebelum-negara-*`.
+3. Filter folder menjadi filter per negara; filter per sumber
+   (`Vietnam\Cong Bao`) bisa menyusul.
+4. Prompt penjawab di `app/rag.py` mengenal kedua negara, memisahkan
+   ketentuan negara asal dan tujuan, dan menulis jawaban dalam bahasa
+   antarmuka: Bahasa Indonesia, English, atau Tiếng Việt.
+5. Crawler mendapat tiga kemampuan untuk situs Vietnam: nomor halaman di path
+   (`page_url_template`, `…/trang-{number}.htm`), saringan judul pada daftar
+   sebelum halaman diambil (`link_text_pattern`), dan unduhan yang menamai
+   berkasnya di query (`…/api/download/stream?…&file_name=…`), dengan jenis
+   berkas yang diutamakan (`attachment_preference`: DOCX, lalu PDF bila hanya
+   ada DOC lama). Server berkas pemerintah Vietnam tidak mengirim sertifikat
+   perantaranya; sertifikat publik itu ada di
+   `app/certificates/intermediates.pem`.
+
+**Bahasa dan pencarian.** Sebagian besar dokumen Vietnam berbahasa Vietnam.
+BGE-M3 dan reranker-nya multibahasa, dan pencarian tidak menyaring bahasa:
+pertanyaan dalam bahasa apa pun menelusuri seluruh korpus, kecuali negara
+dipilih di filter. Uji 29 September 2026:
+
+| Pertanyaan | Hasil teratas | Skor |
+|---|---|---|
+| Indonesia → aturan Indonesia | tepat | 0,99 |
+| English → aturan Indonesia | tepat | 0,97 |
+| Tiếng Việt → aturan Vietnam | tepat | 1,00 |
+| English → aturan Vietnam | dokumen tepat | 0,36 |
+| Tiếng Việt → aturan Indonesia | dokumen tepat | 0,34 |
+| Indonesia → aturan Vietnam | aturan Indonesia, bukan Vietnam | 0,85 |
+
+Bahasa yang sama hampir selalu tepat; lintas bahasa menemukan dokumen yang
+benar dengan skor rendah, dan pertanyaan berbahasa Indonesia tentang Vietnam
+tertarik ke dokumen Indonesia. Sampai pencarian mengenali negara dalam
+pertanyaan, pilih "Vietnam" di filter negara.
+
+### Sumber, menurut pengaruh
+
+| # | Situs | Titik awal | Yang diambil | Perkiraan berkas | Cara |
+|---|---|---|---|---|---|
+| 1 | Hải quan Việt Nam | https://www.customs.gov.vn | Prosedur kepabeanan ekspor dan impor, tanya jawab "Chính sách và thủ tục" (`index.jsp?pageId=14&cid=948`), tarif, dan văn bản. robots.txt mengizinkan semua; isinya diisi JavaScript | ±2.000 *(kasar)* | Chrome |
+| 2 | Công báo (Lembaran Negara) | https://congbao.chinhphu.vn/van-ban-dang-cong-bao/chinh-phu-c1.htm · `quoc-hoi-c31` · `bo-tai-chinh-c10` · `bo-cong-thuong-c3` · `bo-nong-nghiep-va-moi-truong-c167` · `bo-y-te-c25` | Naskah resmi Luật Hải quan, Luật Quản lý ngoại thương, Luật Thuế XK-NK, dan Nghị định serta Thông tư tentang prosedur kepabeanan, pengelolaan perdagangan luar negeri, asal barang, tabel tarif, karantina, dan keamanan pangan impor. Disaring dengan kata kunci judul: hải quan, xuất khẩu, nhập khẩu, xuất xứ, biểu thuế, kiểm dịch, phòng vệ thương mại. Halaman dokumen memuat tanggal dan judul; naskahnya DOCX atau PDF di g7.cdnchinhphu.vn. Bagian: Quốc hội, Chính phủ, Thủ tướng, Bộ Tài chính, Bộ Công Thương, Bộ Nông nghiệp và Môi trường, Bộ Y tế | ±1.500 — sedang di-crawl | HTTP |
+| 3 | Dịch vụ công quốc gia | https://dichvucong.gov.vn/p/home/dvc-chi-tiet-thu-tuc-hanh-chinh.html?ma_thu_tuc=1.000533 | Prosedur administratif bidang ekspor-impor, kepabeanan, karantina, dan keamanan pangan: langkah, dokumen, biaya, lama proses (mis. C/O preferensi `1.000533`, C/O Form E `1.000695`). Bahan utama rekomendasi proses. Tidak merespons dari jaringan ini saat diperiksa | ±300 prosedur *(kasar)* | Chrome |
+| 4 | Bộ Công Thương (MOIT) | https://moit.gov.vn/van-ban-phap-luat | Văn bản pháp quy dan hợp nhất bidang ekspor-impor, daftar barang per HS, ketentuan C/O dan perdagangan luar negeri | ±200 *(kasar)* | HTTP |
+| 5 | Cục Bảo vệ thực vật | https://www.ppd.gov.vn | Persyaratan fitosanitari ekspor-impor, daftar organisme pengganggu, izin impor | ±100 *(kasar)* | HTTP |
+| 6 | Cục Thú y | https://cucthuy.gov.vn | Karantina hewan dan produk hewan | ±100 *(kasar)* | HTTP |
+| 7 | Cục An toàn thực phẩm | https://vfa.gov.vn | Pemeriksaan keamanan pangan impor dan pernyataan mandiri produk. Tidak merespons saat diperiksa | ±100 *(kasar)* | HTTP |
+| 8 | SPS Vietnam · TBT Vietnam | https://www.spsvietnam.gov.vn · https://tbtvn.org | Notifikasi SPS dan TBT, regulasi teknis (QCVN). Rantai sertifikat SSL-nya tidak lengkap, jadi perlu sertifikat perantara | ±200 *(kasar)* | HTTP |
+| 9 | Trung tâm WTO và Hội nhập (VCCI) | https://trungtamwto.vn/fta · `/an-pham` · `/market` · https://wtocenter.vn | Naskah dan komitmen FTA (ATIGA, RCEP, CPTPP, EVFTA), buku panduan asal barang, alat cek tarif, profil pasar; wtocenter.vn versi Inggris | ±500 *(kasar)* | HTTP |
+| 10 | Ngân hàng Nhà nước | https://sbv.gov.vn | Aturan devisa untuk pembayaran ekspor-impor | ±30 *(kasar)* | HTTP |
+| 11 | Bộ Tài chính | https://mof.gov.vn | Kebijakan tarif dan kepabeanan | ±50 *(kasar)* | HTTP |
+| 12 | Perwakilan dagang RI di Vietnam | Atase Perdagangan Hanoi · ITPC Ho Chi Minh City · KBRI Hanoi | Profil pasar dan panduan bagi eksportir Indonesia. Belum diperiksa | ±30 *(kasar)* | HTTP |
+
+### Tidak di-crawl (Vietnam)
+
+| Situs | Alasan |
+|---|---|
+| https://vntr.moit.gov.vn | robots.txt: `Disallow: /` untuk semua crawler. Tarif per HS diambil dari Hải quan dan Trung tâm WTO |
+| https://vbpl.vn | Isi dokumennya dimuat dari `/api/`, yang dilarang robots.txt. Naskah yang sama ada di Công báo |
+| https://phapluat.gov.vn | Menolak permintaan skrip (HTTP 403). Naskah yang sama ada di Công báo |
+| https://thuvienphapluat.vn · https://luatvietnam.vn | Penerbit hukum swasta; berhak cipta dan sebagian berbayar |
+| https://ecosys.gov.vn · https://vnsw.gov.vn | Aplikasi pengajuan C/O dan National Single Window yang memerlukan akun |
+| ASEAN Trade Repository · ASEAN Tariff Finder | Tidak merespons saat diperiksa |
+
+---
+
 ## Mulai cepat
 
 ```powershell
@@ -142,7 +258,7 @@ python main.py ask "..." --folder "1. Budaya Mutu" --backend claude_cli
 python main.py status                # ukuran indeks dan kesiapan backend
 python main.py hash-password         # buat hash kata sandi admin/guest baru untuk .env
 python main.py crawl --site beacukai --full --no-ingest  # salin satu situs sumber ke corpus-exim
-# --site: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei
+# --site: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei, cong-bao
 python main.py crawl --site beacukai --sections Impor,FAQ --limit 5  # sampel kecil, lalu indeks
 ```
 

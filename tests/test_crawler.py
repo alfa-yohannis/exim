@@ -7,6 +7,7 @@ what would be fetched and what would be written while staying offline.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -243,17 +244,68 @@ class TestAttachmentFilename:
         with pytest.raises(UnsupportedAttachment):
             fetcher._filename_of(_Response({"Content-Type": "image/png"}), self.DOWNLOAD)
 
+    def test_takes_the_name_from_the_query_and_keeps_the_regulation_number(self, fetcher):
+        stream = "https://g7.cdnchinhphu.vn/api/download/stream?Url=x&file_name=2026_523_136%2F2026%2FTT-BTC.docx"
+        name = fetcher._filename_of(_Response({"Content-Type": "application/octet-stream"}), stream)
+        assert name == "2026_523_136-2026-TT-BTC.docx"
+
+    def test_a_server_name_with_slashes_keeps_its_number(self, fetcher):
+        response = _Response({"Content-Disposition": 'attachment; filename="136/2026/TT-BTC.docx"'})
+        assert fetcher._filename_of(response, self.DOWNLOAD) == "136-2026-TT-BTC.docx"
+
+    def test_trusts_the_intermediates_servers_leave_out(self, fetcher):
+        bundle = Path(fetcher._session.verify).read_text(encoding="utf-8")
+        assert PoliteFetcher.EXTRA_CERTIFICATES.read_text(encoding="utf-8") in bundle
+        assert bundle.count("BEGIN CERTIFICATE") > 100  # certifi's roots are kept
+
+
+class TestQueryDownloads:
+    """File servers that name the file in the query rather than the path."""
+
+    SITE = CrawlSite(
+        key="berkas",
+        country="Negara",
+        folder="Berkas",
+        root="https://www.example.gov",
+        hosts=frozenset({"www.example.gov"}),
+        attachment_hosts=frozenset({"files.example.gov"}),
+        attachment_path_patterns=(r"^/api/download/stream$",),
+        attachment_exclude_patterns=(r"(?i)file_name=[^&]*\.pdf$",),
+        sections=(),
+    )
+    STREAM = "https://files.example.gov/api/download/stream?Url=abc&file_name=1%2F2026%2FTT.{}"
+
+    def test_a_download_keeps_its_query(self):
+        url = self.STREAM.format("docx")
+        assert SiteUrl(self.SITE).normalise(url, "https://www.example.gov/van-ban/1.htm") == url
+
+    def test_exclusions_see_the_file_named_in_the_query(self):
+        urls = SiteUrl(self.SITE)
+        assert urls.is_wanted_attachment(self.STREAM.format("docx"))
+        assert not urls.is_wanted_attachment(self.STREAM.format("pdf"))
+
+    def test_takes_the_docx_and_else_the_pdf_of_each_document(self):
+        site = replace(self.SITE, attachment_exclude_patterns=(), attachment_preference=(".docx", ".pdf"))
+        stream = "https://files.example.gov/api/download/stream?Url={}&file_name={}"
+        links = "".join(
+            f'<a href="{stream.format(index, name)}">{name}</a>'
+            for index, name in enumerate(["A.docx", "A.pdf", "B.doc", "B.pdf"])
+        )
+        html = f"<html><body><main><p>{'isi ' * 60}</p>{links}</main></body></html>"
+        parsed = PageParser(site).parse(html, "https://www.example.gov/van-ban/1.htm")
+        assert [SiteUrl.file_name_of(link) for _label, link in parsed.attachments] == ["A.docx", "B.pdf"]
+
 
 class TestCorpusPageWriter:
     """Where snapshots land, and where they may never land."""
 
-    def test_writes_under_the_site_and_section_folders(self, isolated_settings):
+    def test_writes_under_the_country_site_and_section_folders(self, isolated_settings):
         writer = CorpusPageWriter(isolated_settings, BEA_CUKAI)
         page = ExternalPage(url="https://www.beacukai.go.id/kurs", label="beacukai.go.id · Tarif dan Kurs")
         parsed = PageParser(BEA_CUKAI).parse(BEACUKAI_PAGE, page.url)
         written = writer.write_page(CrawlSection(folder="Tarif dan Kurs"), page, parsed)
         corpus = Path(isolated_settings.source_directory).resolve()
-        assert written.parent == corpus / "Bea Cukai" / "Tarif dan Kurs"
+        assert written.parent == corpus / "Indonesia" / "Bea Cukai" / "Tarif dan Kurs"
         assert "URL: https://www.beacukai.go.id/kurs" in written.read_text(encoding="utf-8")
 
     def test_refuses_a_target_outside_the_corpus(self, isolated_settings, tmp_path):
@@ -283,6 +335,7 @@ class TestSiteCrawler:
 
     SITE = CrawlSite(
         key="contoh",
+        country="Negara",
         folder="Contoh",
         root="https://www.example.go.id",
         hosts=frozenset({"www.example.go.id"}),
@@ -299,7 +352,7 @@ class TestSiteCrawler:
         return SiteCrawler(isolated_settings, guard).run(self.SITE)
 
     def test_writes_each_distinct_page_once(self, outcome, isolated_settings):
-        files = list((Path(isolated_settings.source_directory) / "Contoh" / "Halaman").glob("*.txt"))
+        files = list((Path(isolated_settings.source_directory) / "Negara" / "Contoh" / "Halaman").glob("*.txt"))
         assert outcome.pages_written == 1 and len(files) == 1
 
     def test_skips_duplicates_and_pages_without_text(self, outcome):
@@ -307,7 +360,7 @@ class TestSiteCrawler:
         assert outcome.pages_skipped == 1
 
     def test_optional_sections_wait_to_be_named(self, outcome, isolated_settings):
-        assert not (Path(isolated_settings.source_directory) / "Contoh" / "Opsional").exists()
+        assert not (Path(isolated_settings.source_directory) / "Negara" / "Contoh" / "Opsional").exists()
 
     def test_keeps_its_manifest_outside_the_corpus(self, outcome, isolated_settings):
         assert (Path(isolated_settings.data_directory) / "crawl-contoh.json").exists()
@@ -364,6 +417,7 @@ class TestScopeAndOrdering:
 
     SITE = CrawlSite(
         key="regulasi",
+        country="Negara",
         folder="Regulasi",
         root=ROOT,
         hosts=frozenset({"www.example.go.id"}),
@@ -410,7 +464,7 @@ class TestScopeAndOrdering:
 
     def test_a_title_outside_the_scope_is_not_written(self, isolated_settings, guard, fetcher):
         outcome = SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
-        written = [p.name for p in (Path(isolated_settings.source_directory) / "Regulasi" / "PMK").glob("*.txt")]
+        written = [p.name for p in (Path(isolated_settings.source_directory) / "Negara" / "Regulasi" / "PMK").glob("*.txt")]
         assert outcome.pages_out_of_scope == 1
         assert len(written) == 1 and written[0].startswith("PMK 1")
 
@@ -431,3 +485,63 @@ class TestScopeAndOrdering:
         downloaded = [url for method, url in fetcher.requests if method == "DOWNLOAD"]
         assert outcome.attachments_too_large == 1
         assert not any("terlalu-besar" in url or "/abstrak/" in url for url in downloaded)
+
+
+class TestNumberedPagesAndLinkText:
+    """A gazette-style listing: pages numbered in the path, titles as the filter."""
+
+    ROOT = "https://congbao.example.vn"
+    LISTING = f"{ROOT}/van-ban-dang-cong-bao/bo-c10.htm"
+
+    SITE = CrawlSite(
+        key="gazette",
+        country="Vietnam",
+        folder="Cong Bao",
+        root=ROOT,
+        hosts=frozenset({"congbao.example.vn"}),
+        content_selectors=("body",),
+        sections=(
+            CrawlSection(
+                folder="Bo",
+                listing_urls=(LISTING,),
+                detail_pattern=r"^/van-ban/[a-z0-9-]+-\d+\.htm$",
+                page_url_template="{stem}/trang-{number}.htm",
+                link_text_pattern=r"hải quan",
+            ),
+        ),
+    )
+
+    @staticmethod
+    def _listing(*documents: tuple[str, str]) -> str:
+        anchors = "".join(f'<a href="/van-ban/{slug}.htm">{title}</a>' for slug, title in documents)
+        return f"<html><body>{anchors}</body></html>"
+
+    @pytest.fixture
+    def fetcher(self, monkeypatch):
+        _CountingFetcher.PAGES = {
+            self.LISTING: self._listing(("thong-tu-1-101", "Thông tư 1 về thủ tục Hải quan"),
+                                        ("thong-tu-2-102", "Thông tư 2 về ngân sách")),
+            f"{self.ROOT}/van-ban-dang-cong-bao/bo-c10/trang-2.htm":
+                self._listing(("thong-tu-3-103", "Thông tư 3 về ngân sách")),
+            f"{self.ROOT}/van-ban-dang-cong-bao/bo-c10/trang-3.htm":
+                self._listing(("thong-tu-4-104", "Thông tư 4 về kiểm tra hải quan")),
+            f"{self.ROOT}/van-ban-dang-cong-bao/bo-c10/trang-4.htm": self._listing(),
+            f"{self.ROOT}/van-ban/thong-tu-1-101.htm": _page("Thông tư 1", body="thủ tục hải quan " * 20),
+            f"{self.ROOT}/van-ban/thong-tu-4-104.htm": _page("Thông tư 4", body="kiểm tra hải quan " * 20),
+        }
+        _CountingFetcher.SIZES = {}
+        _CountingFetcher.requests = []
+        monkeypatch.setattr(crawler_module, "PoliteFetcher", _CountingFetcher)
+        return _CountingFetcher
+
+    def test_walks_numbered_pages_past_one_with_nothing_in_scope(self, isolated_settings, guard, fetcher):
+        SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
+        fetched = [url for method, url in fetcher.requests if method == "GET"]
+        assert f"{self.ROOT}/van-ban-dang-cong-bao/bo-c10/trang-4.htm" in fetched
+        assert f"{self.ROOT}/van-ban/thong-tu-4-104.htm" in fetched
+
+    def test_fetches_only_documents_whose_title_matches(self, isolated_settings, guard, fetcher):
+        outcome = SiteCrawler(isolated_settings, guard).run(self.SITE, full=True)
+        fetched = [url for method, url in fetcher.requests if method == "GET"]
+        assert outcome.pages_written == 2
+        assert not any("thong-tu-2" in url or "thong-tu-3" in url for url in fetched)

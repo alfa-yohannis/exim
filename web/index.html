@@ -5,11 +5,11 @@
   <!-- `interactive-widget` makes Chrome on Android shrink the page when the
        on-screen keyboard opens, so the question box stays above it. -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-  <title>Custom-Local AI: Asisten Ekspor Impor</title>
+  <title data-i18n="page.title">Custom-Local AI: Asisten Ekspor Impor</title>
   <!-- ?v= is the file's content hash. Cloudflare tells browsers to keep static
        files for 4 hours, so a changed file needs a new address to reach them:
-       update the value (here and on app.js) whenever the file changes. -->
-  <link rel="stylesheet" href="/static/styles.css?v=162a5cac">
+       update the value (here and on the scripts) whenever the file changes. -->
+  <link rel="stylesheet" href="/static/styles.css?v=8467da4c">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚢</text></svg>">
 </head>
 <body>
@@ -20,54 +20,55 @@
          button in the tab bar drives both (SidebarController in app.js). -->
     <aside class="sidebar" id="sidebar">
       <header class="sidebar-header">
-        <h1>Custom-Local AI <span class="title-descriptor">Asisten Ekspor Impor</span></h1>
-        <p class="subtitle">Studi kasus: informasi publik ekspor-impor</p>
+        <h1>Custom-Local AI <span class="title-descriptor" data-i18n="brand.descriptor">Asisten Ekspor Impor</span></h1>
+        <p class="subtitle" data-i18n="app.subtitle">Studi kasus: informasi publik ekspor-impor Indonesia dan Vietnam</p>
         <button class="sidebar-close" id="button-sidebar-close" type="button"
+                data-i18n-attr="aria-label:app.closeSidebar;title:app.closeSidebar"
                 aria-label="Tutup panel samping" title="Tutup panel samping">✕</button>
       </header>
 
       <div class="account-bar" id="account-bar">
         <span class="account-avatar" id="account-avatar" aria-hidden="true">?</span>
         <span class="account-identity">
-          <span class="account-name" id="account-name">memuat…</span>
+          <span class="account-name" id="account-name" data-i18n="app.loading">memuat…</span>
           <span class="role-badge" id="account-role"></span>
         </span>
-        <button class="button ghost compact" id="button-logout" type="button">Keluar</button>
+        <button class="button ghost compact" id="button-logout" type="button" data-i18n="app.signOut">Keluar</button>
       </div>
 
       <section class="panel">
-        <h2>Percakapan</h2>
+        <h2 data-i18n="app.conversations">Percakapan</h2>
         <div class="button-row">
-          <button class="button primary" id="button-new-session">+ Percakapan Baru</button>
+          <button class="button primary" id="button-new-session" data-i18n="app.newConversation">+ Percakapan Baru</button>
         </div>
         <div class="session-list" id="session-list">
-          <p class="session-empty">Belum ada percakapan tersimpan.</p>
+          <p class="session-empty" data-i18n="app.noConversations">Belum ada percakapan tersimpan.</p>
         </div>
       </section>
 
       <!-- Hidden until the session is known; shown to admins only. -->
       <section class="panel hidden" id="panel-source">
-        <h2>Sumber Dokumen</h2>
-        <div class="source-path" id="source-path">memuat…</div>
-        <div class="readonly-badge" title="Sistem ini tidak pernah menulis ke direktori sumber">
-          <span class="lock-icon">🔒</span> Akses baca-saja
+        <h2 data-i18n="app.sourcePanel">Sumber Dokumen</h2>
+        <div class="source-path" id="source-path" data-i18n="app.loading">memuat…</div>
+        <div class="readonly-badge" data-i18n-attr="title:app.readOnlyTitle" title="Sistem ini tidak pernah menulis ke direktori sumber">
+          <span class="lock-icon">🔒</span> <span data-i18n="app.readOnly">Akses baca-saja</span>
         </div>
       </section>
 
       <section class="panel">
-        <h2>Status Indeks</h2>
+        <h2 data-i18n="app.indexStatus">Status Indeks</h2>
         <div class="stat-grid">
-          <div class="stat"><span class="stat-value" id="stat-documents">–</span><span class="stat-label">Dokumen</span></div>
-          <div class="stat"><span class="stat-value" id="stat-chunks">–</span><span class="stat-label">Potongan</span></div>
+          <div class="stat"><span class="stat-value" id="stat-documents">–</span><span class="stat-label" data-i18n="app.statDocuments">Dokumen</span></div>
+          <div class="stat"><span class="stat-value" id="stat-chunks">–</span><span class="stat-label" data-i18n="app.statChunks">Potongan</span></div>
           <div class="stat"><span class="stat-value" id="stat-megabytes">–</span><span class="stat-label">MB</span></div>
-          <div class="stat"><span class="stat-value" id="stat-failed">–</span><span class="stat-label">Gagal</span></div>
+          <div class="stat"><span class="stat-value" id="stat-failed">–</span><span class="stat-label" data-i18n="app.statFailed">Gagal</span></div>
         </div>
-        <div class="muted-line" id="stat-last-indexed">Belum pernah diindeks</div>
+        <div class="muted-line" id="stat-last-indexed" data-i18n="app.neverIndexed">Belum pernah diindeks</div>
         <div class="muted-line warning-line hidden" id="stat-scanned"></div>
 
         <div class="button-row">
-          <button class="button primary" id="button-ingest">Perbarui Indeks</button>
-          <button class="button ghost" id="button-rebuild" title="Hapus indeks dan baca ulang seluruh dokumen">Bangun Ulang</button>
+          <button class="button primary" id="button-ingest" data-i18n="app.updateIndex">Perbarui Indeks</button>
+          <button class="button ghost" id="button-rebuild" data-i18n="app.rebuild" data-i18n-attr="title:app.rebuildTitle" title="Hapus indeks dan baca ulang seluruh dokumen">Bangun Ulang</button>
         </div>
         <div class="permission-notice hidden" id="permission-notice" role="alert"></div>
 
@@ -76,34 +77,29 @@
           <div class="progress-caption" id="progress-caption"></div>
           <div class="progress-detail" id="progress-detail"></div>
           <details class="progress-log">
-            <summary>Log proses</summary>
+            <summary data-i18n="app.processLog">Log proses</summary>
             <pre id="progress-log-text"></pre>
           </details>
         </div>
       </section>
 
       <section class="panel">
-        <h2>Model Bahasa</h2>
+        <h2 data-i18n="app.languageModel">Model Bahasa</h2>
         <label class="field-label" for="select-backend">Backend</label>
         <select id="select-backend" class="select"></select>
         <div class="backend-status" id="backend-status"></div>
       </section>
 
       <section class="panel">
-        <h2>Pencarian</h2>
-        <label class="field-label" for="select-folder">Batasi ke folder</label>
-        <select id="select-folder" class="select">
-          <option value="">Semua folder</option>
-        </select>
-
+        <h2 data-i18n="app.search">Pencarian</h2>
         <label class="field-label" for="input-passages">
-          Jumlah sumber: <strong id="passage-count-label">6</strong>
+          <span data-i18n="app.sourceCount">Jumlah sumber:</span> <strong id="passage-count-label">6</strong>
         </label>
         <input type="range" id="input-passages" class="slider" min="3" max="15" value="6">
       </section>
 
       <section class="panel hidden" id="panel-device" data-admin-only>
-        <h2>Perangkat</h2>
+        <h2 data-i18n="app.device">Perangkat</h2>
         <div class="muted-line" id="hardware-line">–</div>
         <div class="muted-line" id="embedding-line">–</div>
         <div class="muted-line" id="reranker-line">–</div>
@@ -125,39 +121,62 @@
             <path d="M4 6.5h16M4 12h16M4 17.5h16" />
           </svg>
         </button>
-        <button class="tab active" data-tab="ask">Tanya Jawab</button>
+        <button class="tab active" data-tab="ask" data-i18n="app.tabAsk">Tanya Jawab</button>
         <!-- Administrators only: hidden until the account is known. -->
-        <button class="tab hidden" data-tab="browse" data-admin-only>Telusuri Potongan</button>
-        <button class="tab hidden" data-tab="documents" data-admin-only>Daftar Dokumen</button>
+        <button class="tab hidden" data-tab="browse" data-admin-only data-i18n="app.tabBrowse">Telusuri Potongan</button>
+        <button class="tab hidden" data-tab="documents" data-admin-only data-i18n="app.tabDocuments">Daftar Dokumen</button>
         <a class="tab-link" href="/docs" target="_blank" rel="noopener noreferrer"
+           data-i18n="app.apiDocs" data-i18n-attr="title:app.apiDocsTitle"
            title="Dokumentasi REST API (Swagger UI) — terbuka di tab baru">Dokumentasi API ↗</a>
+        <div class="language-switcher" data-language-switcher></div>
       </nav>
 
       <!-- ---------------------------- ASK ---------------------------- -->
       <section class="tab-panel active" id="panel-ask">
-        <div class="conversation-toolbar hidden" id="conversation-toolbar">
-          <span class="toolbar-label">Panel sumber</span>
-          <button class="toolbar-button" id="button-expand-sources">Buka semua</button>
-          <button class="toolbar-button" id="button-collapse-sources">Tutup semua</button>
+        <div class="conversation-toolbar" id="conversation-toolbar">
+          <!-- Whose rules the question is about. The question is restated in
+               that country's language and searched only in its documents. -->
+          <div class="toolbar-country" data-i18n-attr="title:app.countryHint"
+               title="Pilih negara yang aturannya ingin Anda tanyakan. Pertanyaan dicari di dokumen negara itu.">
+            <span class="toolbar-label" id="country-label" data-i18n="app.countryLabel">Aturan negara:</span>
+            <!-- The select holds the value the page reads; the picker beside it
+                 shows it with flags, which a native select cannot draw. -->
+            <select id="select-country" class="hidden" aria-hidden="true" tabindex="-1"></select>
+            <div class="country-picker">
+              <button type="button" class="country-button" id="country-button"
+                      aria-haspopup="listbox" aria-expanded="false"
+                      aria-labelledby="country-label country-button"></button>
+              <ul class="country-list hidden" id="country-list" role="listbox"
+                  aria-labelledby="country-label"></ul>
+            </div>
+          </div>
+          <!-- Shown once an answer has a source panel to open or close. -->
+          <div class="toolbar-sources hidden" id="toolbar-sources">
+            <span class="toolbar-label" data-i18n="app.sourcePanels">Panel sumber</span>
+            <button class="toolbar-button" id="button-expand-sources" data-i18n="app.openAll">Buka semua</button>
+            <button class="toolbar-button" id="button-collapse-sources" data-i18n="app.closeAll">Tutup semua</button>
+          </div>
         </div>
         <div class="conversation" id="conversation">
           <div class="welcome">
-            <h2>Tanyakan apa saja tentang ekspor-impor</h2>
-            <p>Jawaban disusun dari salinan halaman dan dokumen publik situs pemerintah terkait ekspor-impor, seperti Bea Cukai, selalu disertai sitasi ke sumbernya. Ini demo, bukan layanan resmi pemerintah.</p>
+            <h2 data-i18n="app.welcomeTitle">Tanyakan apa saja tentang ekspor-impor</h2>
+            <p data-i18n="app.welcomeBody">Jawaban disusun dari salinan halaman dan dokumen publik situs pemerintah Indonesia dan Vietnam terkait ekspor-impor, selalu disertai sitasi ke sumbernya. Ini demo, bukan layanan resmi pemerintah.</p>
+            <!-- Questions every country's rules answer, whichever is chosen. -->
             <div class="example-questions" id="example-questions">
-              <button class="example">Apa itu impor untuk dipakai dan dokumen apa yang diperlukan?</button>
-              <button class="example">Apa saja fasilitas Kemudahan Impor Tujuan Ekspor (KITE)?</button>
-              <button class="example">Bagaimana ketentuan bea masuk untuk barang kiriman dari luar negeri?</button>
-              <button class="example">Bagaimana cara mengajukan keberatan atas penetapan nilai pabean?</button>
+              <button class="example" data-i18n="app.example1">Dokumen apa saja yang diperlukan untuk mengimpor barang?</button>
+              <button class="example" data-i18n="app.example2">Bagaimana prosedur kepabeanan untuk mengekspor barang?</button>
+              <button class="example" data-i18n="app.example3">Bagaimana cara mendapatkan tarif bea masuk preferensi ATIGA dengan Form D?</button>
+              <button class="example" data-i18n="app.example4">Barang apa saja yang dilarang atau dibatasi untuk diimpor?</button>
             </div>
           </div>
         </div>
 
         <form class="composer" id="composer">
           <textarea id="input-question" class="composer-input" rows="1"
+                    data-i18n-attr="placeholder:app.questionPlaceholder"
                     placeholder="Tulis pertanyaan… (Enter untuk kirim, Shift+Enter baris baru)"></textarea>
-          <button type="submit" class="button primary send" id="button-send">Kirim</button>
-          <button type="button" class="button ghost hidden" id="button-stop">Hentikan</button>
+          <button type="submit" class="button primary send" id="button-send" data-i18n="app.send">Kirim</button>
+          <button type="button" class="button ghost hidden" id="button-stop" data-i18n="app.stop">Hentikan</button>
         </form>
       </section>
 
@@ -165,33 +184,35 @@
       <section class="tab-panel" id="panel-browse">
         <form class="browse-form" id="browse-form">
           <input type="text" id="input-browse" class="text-input"
+                 data-i18n-attr="placeholder:app.browsePlaceholder"
                  placeholder="Cari potongan dokumen tanpa membuat jawaban…">
-          <button type="submit" class="button primary">Cari</button>
+          <button type="submit" class="button primary" data-i18n="app.browseSubmit">Cari</button>
         </form>
         <div class="passage-list" id="browse-results">
-          <p class="empty-hint">Masukkan kata kunci untuk melihat potongan dokumen yang paling relevan, lengkap dengan skor pencarian semantik dan kata kunci.</p>
+          <p class="empty-hint" data-i18n="app.browseHint">Masukkan kata kunci untuk melihat potongan dokumen yang paling relevan, lengkap dengan skor pencarian semantik dan kata kunci.</p>
         </div>
       </section>
 
       <!-- ------------------------- DOCUMENTS ------------------------- -->
       <section class="tab-panel" id="panel-documents">
         <div class="document-toolbar">
-          <input type="text" id="input-document-filter" class="text-input" placeholder="Saring berdasarkan nama atau folder…">
+          <input type="text" id="input-document-filter" class="text-input"
+                 data-i18n-attr="placeholder:app.documentFilter" placeholder="Saring berdasarkan nama atau negara…">
           <select id="select-document-status" class="select compact">
-            <option value="">Semua status</option>
-            <option value="indexed">Terindeks</option>
-            <option value="empty">Kosong / hasil pindai</option>
-            <option value="failed">Gagal dibaca</option>
+            <option value="" data-i18n="app.allStatuses">Semua status</option>
+            <option value="indexed" data-i18n="app.statusIndexed">Terindeks</option>
+            <option value="empty" data-i18n="app.statusEmptyScanned">Kosong / hasil pindai</option>
+            <option value="failed" data-i18n="app.statusUnreadable">Gagal dibaca</option>
           </select>
-          <button class="button ghost" id="button-refresh-documents">Muat Ulang</button>
+          <button class="button ghost" id="button-refresh-documents" data-i18n="app.reload">Muat Ulang</button>
         </div>
         <div class="document-table-wrapper">
           <table class="document-table">
             <thead>
               <tr>
-                <th>Dokumen</th><th>Folder</th><th>Status</th>
-                <th class="numeric">Ukuran</th>
-                <th class="numeric">Potongan</th><th class="numeric">Bagian</th><th></th>
+                <th data-i18n="app.columnDocument">Dokumen</th><th data-i18n="app.columnCountry">Negara</th><th data-i18n="app.columnStatus">Status</th>
+                <th class="numeric" data-i18n="app.columnSize">Ukuran</th>
+                <th class="numeric" data-i18n="app.columnChunks">Potongan</th><th class="numeric" data-i18n="app.columnSections">Bagian</th><th></th>
               </tr>
             </thead>
             <tbody id="document-rows"></tbody>
@@ -207,6 +228,7 @@
        a CDN so the interface keeps working without internet access. -->
   <script src="/static/vendor/marked.min.js"></script>
   <script src="/static/vendor/purify.min.js"></script>
-  <script src="/static/app.js?v=88261846"></script>
+  <script src="/static/i18n.js?v=da48685b"></script>
+  <script src="/static/app.js?v=2006d49a"></script>
 </body>
 </html>
