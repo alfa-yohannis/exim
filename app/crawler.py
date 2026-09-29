@@ -109,6 +109,9 @@ class CrawlSite:
     boilerplate_prefixes: tuple[str, ...] = ()
     #: Regex removed from the ``<title>``, typically the site-name suffix.
     title_suffix: str = ""
+    #: Elements naming the page itself, tried in order before ``<title>``, for
+    #: sites whose ``<title>`` is the same on every page.
+    title_selectors: tuple[str, ...] = ()
     #: Hosts serving the site's downloads (a file CDN). Only attachment links
     #: are taken from them.
     attachment_hosts: frozenset[str] = frozenset()
@@ -222,11 +225,15 @@ class PageParser:
         self._urls = SiteUrl(site)
         self._title_suffix = re.compile(site.title_suffix, re.IGNORECASE) if site.title_suffix else None
 
+    #: Zero-width characters that editors leave inside words ("An​ggota");
+    #: kept, they would split the word for keyword search.
+    INVISIBLE_CHARACTERS = dict.fromkeys(map(ord, "​‌‍⁠﻿"))
+
     def parse(self, html: str, url: str) -> ParsedPage:
         """Return the title, readable text, links and attachments of ``html``."""
-        from bs4 import BeautifulSoup
+        from bs4 import BeautifulSoup, Comment
 
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html.translate(self.INVISIBLE_CHARACTERS), "html.parser")
         title = self._title_of(soup)
 
         # A listing's entries can sit in a block beside the main one, so when
@@ -238,6 +245,10 @@ class PageParser:
         for tag_name in WebPageReader.NON_CONTENT_TAGS:
             for element in content.find_all(tag_name):
                 element.decompose()
+        # Commented-out markup is never content; left in, the line flattening
+        # below would turn it into text (e-SKA comments out PHP error output).
+        for comment in content.find_all(string=lambda text: isinstance(text, Comment)):
+            comment.extract()
         for selector in self._site.furniture_selectors:
             for element in content.select(selector):
                 element.decompose()
@@ -287,7 +298,11 @@ class PageParser:
         return "\n".join(line for line in lines if line)
 
     def _title_of(self, soup) -> str:
-        """Return the page title without the site-name suffix."""
+        """Return the page's own title: a named element, else ``<title>`` without the site name."""
+        for selector in self._site.title_selectors:
+            element = soup.select_one(selector)
+            if element is not None and element.get_text(strip=True):
+                return " ".join(element.get_text(" ", strip=True).split())
         raw_title = soup.title.get_text(strip=True) if soup.title else ""
         title = self._title_suffix.sub("", raw_title).strip() if self._title_suffix else raw_title
         if not title:

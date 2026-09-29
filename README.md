@@ -24,8 +24,8 @@ berkas dan halaman sumbernya.
 | **Penjawab** | Qwen3 8B lokal via Ollama, atau CLI Claude Code / Codex / Antigravity |
 | **Sumber eksternal** | Salinan bertanggal SINTA (dengan login & paginasi), Google Scholar, PDDikti, dan situs kampus |
 | **Antarmuka** | Satu halaman: jawaban Markdown mengalir, sitasi dapat diklik, tautan ke sumber asli, salin ke papan klip, unduh dokumen, percakapan tersimpan |
-| **Skala saat ini** | Korpus ekspor-impor belum di-crawl |
-| **Pengujian** | 518 pengujian unit, selesai dalam ±15 detik tanpa jaringan |
+| **Skala saat ini** | ±2.500 berkas dari 7 situs (Bea Cukai, JDIH Kemenkeu, e-SKA, LPEI, Bank Indonesia, Ditjen Daglu, Ditjen PEN), ±59.000 potongan teks |
+| **Pengujian** | 536 pengujian unit, selesai dalam ±16 detik tanpa jaringan |
 
 ---
 
@@ -38,9 +38,11 @@ Cukai dan JDIH Kemenkeu, pengunduhan dimulai dari sumber dengan perkiraan
 berkas paling sedikit.
 
 Kolom **Perkiraan berkas** menghitung halaman dan lampiran yang akan diambil,
-bukan seluruh situs; berita tidak dihitung. Angka tanpa tanda berasal dari hasil
-crawl, sitemap, atau sampel. Yang bertanda *(kasar)* masih tebakan dari
-struktur situs dan diperbarui saat situsnya dipetakan.
+bukan seluruh situs; berita tidak dihitung, kecuali bila beritanya sendiri
+yang diambil (edaran e-SKA, siaran pers LPEI). Angka bertanda "sudah" adalah
+hasil crawl; yang lain berasal dari sitemap atau sampel. Yang bertanda
+*(kasar)* masih tebakan dari struktur situs dan diperbarui saat situsnya
+dipetakan.
 
 Kolom **Cara** menentukan pembacanya. **HTTP** berarti halaman dapat diambil
 langsung. **Chrome** berarti isinya baru muncul setelah JavaScript berjalan,
@@ -48,10 +50,11 @@ sehingga dibaca lewat Chrome lokal di mesin ini yang dilekati lewat DevTools —
 jalur yang sama dengan `app/browser_sources.py`. Tutup Chrome selama crawl
 berjalan, karena porta debug tidak dapat dipakai bersamaan.
 
-URL dan robots.txt diperiksa pada 28 September 2026. Crawler-nya
-`app/crawler.py`, dengan rencana per situs di `app/crawl_sites.py`. Bea Cukai
-(`--site beacukai`) sudah di-crawl, dan JDIH Kemenkeu (`--site jdih-kemenkeu`)
-sedang diunduh; situs lain menyusul.
+URL dan robots.txt diperiksa pada 28–29 September 2026. Crawler-nya
+`app/crawler.py`, dengan rencana per situs di `app/crawl_sites.py`. Sudah
+di-crawl: Bea Cukai (`--site beacukai`), JDIH Kemenkeu (`jdih-kemenkeu`),
+Ditjen Daglu (`daglu`), e-SKA (`e-ska`), Ditjen PEN (`pen`), Bank Indonesia
+(`bi`), dan LPEI (`lpei`); situs lain menyusul.
 Hasilnya masuk ke `corpus-exim\<Situs>\<Bagian>\`, sehingga filter folder di
 antarmuka menjadi filter per sumber. Lihat
 [Berjalan di latar belakang](#berjalan-di-latar-belakang).
@@ -62,10 +65,10 @@ antarmuka menjadi filter per sumber. Lihat
 |---|---|---|---|---|---|
 | 1 | Bea Cukai | https://www.beacukai.go.id/peta-situs | Prosedur ekspor dan impor, larangan dan pembatasan, BTKI dan tarif, FAQ, barang kiriman dan penumpang, fasilitas (KITE, Kawasan Berikat, AEO, MITA), FTZ, KEK, keberatan dan banding. Halaman: `/impor-untuk-dipakai`, `/klinik-ekspor`, `/larangan-pembatasan`, `/btki-dan-tarif`, `/faq`, `/barangkiriman`, `/barang-penumpang`, `/registrasi-kepabeanan`, `/pemeriksaan-pabean`, `/impor-sementara`, `/keberatan-banding`, `/fasilitas-kite`, `/fasilitas-tempat-penimbunan-berikat`, `/fasilitas-aeo`, `/fasilitas-mita`, `/fta`, `/free-trade-zone`, `/kawasan-ekonomi-khusus` | ±460 — sudah (97 halaman + 359 lampiran) | HTTP |
 | 2 | INSW — Indonesia National Trade Repository | https://insw.go.id/intr | Per pos tarif (HS): tarif bea masuk dan keluar, ketentuan lartas, instansi penerbit izin. Jenis pertanyaan yang paling sering muncul: "HS sekian kena apa saja?" | ±11.000 pos tarif HS | Chrome |
-| 3 | JDIH Kemenkeu | https://jdih.kemenkeu.go.id/sitemap.xml | PMK.04 (Bea Cukai) seluruhnya; PMK.010/.011 (BKF) dan PMK sejak 2023 hanya yang judulnya menyangkut kepabeanan atau perdagangan. Tiap PMK: halaman metadata (status, riwayat pencabutan dan perubahan) dan PDF teks lengkap, diunduh dari yang terkecil, tanpa abstrak. Hindari `/pdfjs` dan `/api/auth` (robots.txt) | ±870 PMK + PDF, ±5 GB — sedang diunduh | HTTP |
+| 3 | JDIH Kemenkeu | https://jdih.kemenkeu.go.id/sitemap.xml | PMK.04 (Bea Cukai) seluruhnya; PMK.010/.011 (BKF) dan PMK sejak 2023 hanya yang judulnya menyangkut kepabeanan atau perdagangan. Tiap PMK: halaman metadata (status, riwayat pencabutan dan perubahan) dan PDF teks lengkap, diunduh dari yang terkecil, tanpa abstrak. Hindari `/pdfjs` dan `/api/auth` (robots.txt) | 1.539 — sudah (898 halaman PMK + 641 PDF; 20 PDF di atas 30 MB dilewati) | HTTP |
 | 4 | JDIH BPK | https://peraturan.bpk.go.id/Search?keywords=kepabeanan · `/sitemap.xml` | UU Kepabeanan (10/1995 jo. 17/2006), UU Perdagangan (7/2014), PP 29/2021, PP DHE (36/2023), serta Permendag kebijakan ekspor dan impor — pengganti jdih.kemendag.go.id yang menolak crawler AI | ±150 peraturan + PDF | HTTP |
 | 5 | Kemendag — Informasi Mekanisme Ekspor Impor | https://exim.kemendag.go.id | Mekanisme ekspor-impor per komoditas, persyaratan perizinan, ketentuan asal barang | ±300 *(kasar)* | Chrome |
-| 6 | Ditjen Perdagangan Luar Negeri | https://ditjendaglu.kemendag.go.id/faq · `/publikasi` · `/infografis` · `/sitemap.xml` | FAQ kebijakan dan perizinan ekspor-impor, ketentuan asal barang, publikasi. Hanya HTML: robots.txt melarang PDF, ZIP, DOCX, dan PPTX | ±20 halaman | HTTP |
+| 6 | Ditjen Perdagangan Luar Negeri | https://ditjendaglu.kemendag.go.id/faq | FAQ kebijakan dan perizinan ekspor-impor per komoditas dan ketentuan asal barang (6 halaman `?page=`). Hanya HTML: robots.txt melarang PDF, ZIP, DOCX, dan PPTX, sehingga publikasi, infografis, dan himpunan peraturan yang berupa PDF tidak diambil | 6 — sudah | HTTP |
 
 ### Tier 2 — Lartas dan perizinan sektoral
 
@@ -82,11 +85,11 @@ antarmuka menjadi filter per sumber. Lihat
 
 | # | Situs | Titik awal | Yang diambil | Perkiraan berkas | Cara |
 |---|---|---|---|---|---|
-| 13 | Ditjen Perundingan Perdagangan Internasional | https://ditjenppi.kemendag.go.id | Daftar dan isi perjanjian dagang (FTA, CEPA) | ±20 halaman | HTTP |
-| 14 | e-SKA Kemendag | https://e-ska.kemendag.go.id/cms.php | Informasi Surat Keterangan Asal (SKA) — bagian publik saja | ±10 *(kasar)* | HTTP |
-| 15 | Ditjen Pengembangan Ekspor Nasional | https://ditjenpen.kemendag.go.id | Program pengembangan ekspor dan informasi pasar | ±15 halaman | HTTP |
-| 16 | Bank Indonesia | https://www.bi.go.id/id | Ketentuan devisa hasil ekspor (DHE) dan pelaporannya. Halaman spesifiknya belum dipetakan | ±15 *(kasar)* | HTTP |
-| 17 | LPEI (Indonesia Eximbank) | https://www.indonesiaeximbank.go.id | Pembiayaan, penjaminan, dan asuransi ekspor | ±30 halaman | HTTP |
+| 13 | Ditjen Perundingan Perdagangan Internasional | https://ditjenppi.kemendag.go.id | Daftar dan isi perjanjian dagang (FTA, CEPA). Ditunda: factsheet dan naskah perjanjian berupa PDF yang dilarang robots.txt, dan halaman perundingan (ASEAN, bilateral, WTO) mengisi tabnya lewat JavaScript; HTML-nya hanya profil direktorat | — ditunda | Chrome, bila PDF tetap dilarang |
+| 14 | e-SKA Kemendag | https://e-ska.kemendag.go.id/cms.php | Informasi SKA (tentang SKA, peraturan, tutorial, tarif preferensi negara tujuan, FAQ) beserta buku panduan dan alur pengajuannya; ±110 edaran (Form E, D, AK, REX/GSP, ketentuan asal barang, notifikasi negara mitra) beserta lampirannya; kegiatan. Pengumuman pemeliharaan sistem dan dua unggahan uji dilewati | 265 — sudah (153 halaman + 112 lampiran) | HTTP |
+| 15 | Ditjen Pengembangan Ekspor Nasional | https://ditjenpen.kemendag.go.id/faq | FAQ cara memulai ekspor, informasi pasar, dan program promosi (4 halaman `?page=`). Majalah Warta Ekspor tampil sebagai flipbook JavaScript, belum diambil | 4 — sudah | HTTP |
+| 16 | Bank Indonesia | https://www.bi.go.id/id/publikasi/peraturan | Devisa hasil ekspor (DHE) dan devisa pembayaran impor: PBI 7/2023 beserta perubahannya (PBI 3/2025, 5/2026), PADG 4/2023 beserta perubahannya (PADG 6/2024, 4/2025, 16/2026), PBI 21/14/PBI/2019 yang digantikannya, dan dua siaran pers. Tiap peraturan: ringkasan, PDF peraturan, dan PDF tanya jawab. Situsnya tanpa sitemap, jadi halamannya disebut satu per satu | 30 — sudah (10 halaman + 20 PDF) | HTTP |
+| 17 | LPEI (Indonesia Eximbank) | https://www.indonesiaeximbank.go.id/product-services · `/sitemap.xml` | 18 produk (pembiayaan modal kerja dan investasi ekspor, buyers credit, penjaminan termasuk penjaminan kepabeanan, asuransi piutang dagang, jasa konsultasi dan Rintisan Eksportir Baru), FAQ, serta ±190 siaran pers dan artikel | 212 — sudah (201 halaman + 11 lampiran) | HTTP |
 | 18 | Salinan pajak.go.id | `D:\ALFA\djp\corpus-pajak` (proyek djp) | PPN impor, PPh 22 impor, fasilitas pajak Kawasan Berikat dan KITE — cukup disaring, tidak perlu crawl ulang | ±100 dari 10.250 berkas *(kasar)* | — |
 
 ### Tidak di-crawl
@@ -139,6 +142,7 @@ python main.py ask "..." --folder "1. Budaya Mutu" --backend claude_cli
 python main.py status                # ukuran indeks dan kesiapan backend
 python main.py hash-password         # buat hash kata sandi admin/guest baru untuk .env
 python main.py crawl --site beacukai --full --no-ingest  # salin satu situs sumber ke corpus-exim
+# --site: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei
 python main.py crawl --site beacukai --sections Impor,FAQ --limit 5  # sampel kecil, lalu indeks
 ```
 

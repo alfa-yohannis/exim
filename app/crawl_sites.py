@@ -190,6 +190,204 @@ JDIH_KEMENKEU = CrawlSite(
     ),
 )
 
+# --- Kemendag directorates ------------------------------------------------------
+
+
+def _kemendag_directorate(
+    key: str, folder: str, subdomain: str, faq_pages: int, robots_forbid_documents: bool
+) -> CrawlSite:
+    """Return the plan for one Ministry of Trade directorate site.
+
+    The directorates share one CMS. Their publications and regulation lists
+    are PDFs shown in a JavaScript flipbook, and their topic pages fill tabs
+    with JavaScript, so the text a crawler can read is the FAQ, spread over
+    ``?page=`` pages.
+    """
+    root = f"https://{subdomain}.kemendag.go.id"
+    return CrawlSite(
+        key=key,
+        folder=folder,
+        root=root,
+        hosts=frozenset({f"{subdomain}.kemendag.go.id"}),
+        content_selectors=("div.single-content", "main"),
+        furniture_selectors=("ul.pagination",),
+        title_suffix=r"\s*-\s*Ditjen \w+\s*$",
+        # robots.txt: "Disallow: /*.pdf$" and the same for ZIP, PPTX, DOCX, WEBP.
+        attachment_exclude_patterns=(
+            (r"(?i)\.(pdf|zip|pptx|docx|webp)$",) if robots_forbid_documents else ()
+        ),
+        sections=(
+            CrawlSection(
+                folder="FAQ",
+                fixed_urls=(f"{root}/faq",) + tuple(
+                    f"{root}/faq?page={number}" for number in range(2, faq_pages + 1)
+                ),
+            ),
+        ),
+    )
+
+
+#: Ditjen Perdagangan Luar Negeri: FAQ on export and import policy, licensing,
+#: and origin rules. HTML only, as its robots.txt forbids the documents.
+DAGLU = _kemendag_directorate(
+    "daglu", "Daglu Kemendag", "ditjendaglu", faq_pages=6, robots_forbid_documents=True
+)
+
+#: Ditjen Pengembangan Ekspor Nasional: FAQ on how to start exporting,
+#: market information, and export promotion programmes.
+PEN = _kemendag_directorate(
+    "pen", "PEN Kemendag", "ditjenpen", faq_pages=4, robots_forbid_documents=False
+)
+
+_ESKA_ROOT = "https://e-ska.kemendag.go.id"
+
+
+def _eska_pages(*slugs: str) -> tuple[str, ...]:
+    """Return absolute URLs of e-SKA's public pages."""
+    return tuple(f"{_ESKA_ROOT}/home.php/home/{slug}" for slug in slugs)
+
+
+#: e-SKA issues certificates of origin (SKA). Its public side explains them,
+#: lists the preferential tariff schemes, and keeps a decade of circulars on
+#: forms, rules of origin, and partner-country notices, many with a PDF.
+#: Every page has the same <title>, so the title comes from the page: the
+#: active menu item (skipping "Beranda", which marks the home and news pages),
+#: then a circular's heading, then an information page's heading. robots.txt
+#: is absent.
+E_SKA = CrawlSite(
+    key="e-ska",
+    folder="e-SKA Kemendag",
+    root=_ESKA_ROOT,
+    hosts=frozenset({"e-ska.kemendag.go.id"}),
+    # Relative links on a circular resolve below /home.php/, where the
+    # server has no files; the same files are served from the root.
+    path_rewrites=((r"^/home\.php/(?=uploads/|cms\.php/)", "/"),),
+    # A circular sits beside a "latest news" column; the home page has no
+    # columns, only the news block holding the manuals.
+    content_selectors=("#news-section .col-md-8", "#solution", "#faq", "#news-section"),
+    # The index lists every circular in a block of its own.
+    link_region_selectors=("body",),
+    title_selectors=(
+        "li.cool-link.active:not(:first-child)", "#news-section .col-md-8 h3", "#solution h2",
+    ),
+    title_suffix=r"^\.:\s*|\s*:\.$",
+    sections=(
+        CrawlSection(
+            folder="Informasi SKA",
+            # The home page carries the user manuals and the SKA flow charts.
+            fixed_urls=(f"{_ESKA_ROOT}/cms.php",)
+            + _eska_pages("form", "rules", "tutorial", "preferensi", "faq"),
+            sample_attachment_limit=20,
+            smallest_attachments_first=True,
+        ),
+        CrawlSection(
+            folder="Edaran dan Berita",
+            listing_urls=_eska_pages("berita_index"),
+            detail_pattern=r"^/home\.php/home/news_detil/\d+$",
+            paginate=False,
+            # System maintenance notices, holidays, and two test posts.
+            title_pattern=r"^(?!.*(?:maintenance|downtime|libur|fsddfs|fdasafdafd))",
+            sample_limit_per_listing=150,
+            sample_attachment_limit=40,
+            # Two regulations attached here exceed the size limit.
+            smallest_attachments_first=True,
+        ),
+        CrawlSection(
+            folder="Kegiatan",
+            listing_urls=_eska_pages("kegiatan_index"),
+            detail_pattern=r"^/home\.php/home/event_detil/\d+$",
+            paginate=False,
+            # Most events are the vendor's maintenance visits to issuing offices.
+            title_pattern=r"^(?!.*maintenance)",
+            sample_limit_per_listing=150,
+        ),
+    ),
+)
+
+# --- LPEI (Indonesia Eximbank) ---------------------------------------------------
+
+_LPEI_ROOT = "https://www.indonesiaeximbank.go.id"
+
+#: Indonesia Eximbank finances, guarantees, and insures exports. Each product
+#: page explains one scheme (working capital, buyer's credit, customs bonds,
+#: receivables insurance, new-exporter coaching); its banner is only a menu of
+#: every product, and its "how to apply" tab is the same contact form
+#: everywhere. The press releases and articles, listed in the sitemap, cover
+#: export risks, programmes, and villages that export. robots.txt allows all.
+LPEI = CrawlSite(
+    key="lpei",
+    folder="LPEI",
+    root=_LPEI_ROOT,
+    hosts=frozenset({"www.indonesiaeximbank.go.id", "indonesiaeximbank.go.id"}),
+    content_selectors=("section.product-wrapper", "section#news-detail", "#accordionFaq", "main"),
+    furniture_selectors=("#div-apply",),
+    title_suffix=r"\s*\|\s*Lembaga Pembiayaan Ekspor Indonesia \(Eximbank\)\s*$",
+    sections=(
+        CrawlSection(
+            folder="Produk dan Jasa",
+            fixed_urls=(f"{_LPEI_ROOT}/faq",),
+            listing_urls=(f"{_LPEI_ROOT}/product-services",),
+            detail_pattern=r"^/product-services/[a-z0-9-]+$",
+            paginate=False,
+        ),
+        CrawlSection(
+            folder="Informasi Publik",
+            listing_urls=(f"{_LPEI_ROOT}/sitemap.xml",),
+            detail_pattern=r"^/public-information/[a-z0-9-]+$",
+            paginate=False,
+            sample_limit_per_listing=40,
+        ),
+    ),
+)
+
+# --- Bank Indonesia ---------------------------------------------------------------
+
+_BI_ROOT = "https://www.bi.go.id"
+
+
+def _bi_regulations(*names: str) -> tuple[str, ...]:
+    """Return the pages of Bank Indonesia regulations, named as the site names them."""
+    return tuple(f"{_BI_ROOT}/id/publikasi/peraturan/Pages/{name}.aspx" for name in names)
+
+
+#: Bank Indonesia sets how exporters bring home and report export proceeds
+#: (devisa hasil ekspor, DHE) and, for natural resources, how long they keep
+#: them onshore. bi.go.id has no sitemap and its regulation index shows only
+#: the newest few, so the plan names the DHE regulations and their amendments
+#: (found through the site's own titles). Each page summarises its regulation
+#: and links the full text and a Q&A document, both PDFs.
+BANK_INDONESIA = CrawlSite(
+    key="bi",
+    folder="Bank Indonesia",
+    root=_BI_ROOT,
+    hosts=frozenset({"www.bi.go.id", "bi.go.id"}),
+    disallowed_prefixes=(
+        "/_layouts", "/Style Library", "/SiteCollectionImages", "/Banner", "/Menu Image",
+        "/Lists", "/WorkflowTasks",
+    ),
+    content_selectors=("#DeltaPlaceHolderMain .content-text", "#DeltaPlaceHolderMain", "body"),
+    # A "was this page useful?" survey, and a visit counter that changes daily.
+    furniture_selectors=(".survey-wrapper", "#layout-hits"),
+    sections=(
+        CrawlSection(
+            folder="Devisa Hasil Ekspor",
+            fixed_urls=_bi_regulations(
+                # PBI 7/2023 and its amendments (3/2025, 5/2026).
+                "PBI_072023", "PBI_032025", "PBI_052026",
+                # PADG 4/2023, which carries it out, and its amendments.
+                "PADG_042023", "PADG_062024", "PADG_042025", "PADG_162026",
+                # PBI 21/14/PBI/2019, which PBI 7/2023 replaced.
+                "pbi_211419",
+            ) + (
+                f"{_BI_ROOT}/id/publikasi/ruang-media/news-release/Pages/sp_2520923.aspx",
+                f"{_BI_ROOT}/id/publikasi/ruang-media/news-release/Pages/sp_229720.aspx",
+            ),
+            sample_attachment_limit=40,
+            smallest_attachments_first=True,
+        ),
+    ),
+)
+
 # --- pajak.go.id (reference; its corpus already exists in corpus-pajak) --------
 
 _PAJAK_ROOT = "https://www.pajak.go.id"
@@ -268,4 +466,7 @@ PAJAK = CrawlSite(
 )
 
 #: Every crawlable site, by its command-line key, in order of influence.
-SITES: dict[str, CrawlSite] = {site.key: site for site in (BEA_CUKAI, JDIH_KEMENKEU, PAJAK)}
+SITES: dict[str, CrawlSite] = {
+    site.key: site
+    for site in (BEA_CUKAI, JDIH_KEMENKEU, DAGLU, E_SKA, PEN, BANK_INDONESIA, LPEI, PAJAK)
+}

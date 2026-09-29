@@ -84,7 +84,10 @@ class CommandLineInterface:
         crawl_parser.add_argument(
             "--site",
             default="beacukai",
-            help="Situs yang diambil (bawaan: beacukai). Pilihan: beacukai, jdih-kemenkeu, pajak",
+            help=(
+                "Situs yang diambil (bawaan: beacukai). "
+                "Pilihan: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei, pajak"
+            ),
         )
         crawl_parser.add_argument(
             "--full",

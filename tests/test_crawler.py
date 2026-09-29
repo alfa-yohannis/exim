@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from app import crawler as crawler_module
-from app.crawl_sites import BEA_CUKAI, PAJAK
+from app.crawl_sites import BANK_INDONESIA, BEA_CUKAI, DAGLU, E_SKA, LPEI, PAJAK, PEN
 from app.crawler import (
     CorpusPageWriter,
     CrawlSection,
@@ -113,6 +113,106 @@ class TestPageParser:
         assert parsed.attachments == [
             ("Unduh PMK", "https://oneweb-file.beacukai.go.id/cdn/download/file/65000edecd0d5bae04e2e194")
         ]
+
+
+ESKA_CIRCULAR = """
+<html><head><title>.:E-Ska (Electronic Certificate of Origin Service):.</title></head><body>
+  <section id="header-top"><h1>hidden</h1></section>
+  <ul>
+    <li class="cool-link active"><a href="/home.php">Beranda</a></li>
+    <li class="cool-link"><a href="/home.php/home/faq">FAQ</a></li>
+  </ul>
+  <section id="news-section"><div class="row">
+    <div class="col-md-8">
+      <h3>Edaran Pemberlakuan e-SKA Form E Untuk Barang Ekspor Indonesia ke China</h3>
+      <p>SKA Form E tujuan China dikirimkan secara elektronik.</p>
+      <!-- <p><a href="<div style="border:1px solid #990000;">
+      <h4>A PHP Error was encountered</h4>
+      </div>">Tonton di Youtube</a></p> -->
+      <a href="http://e-ska.kemendag.go.id/uploads/SE700.pdf">SE Direktur Fasilitasi Ekspor dan Impor</a>
+    </div>
+    <div class="col-md-4"><h3>Berita Terakhir</h3><h4>fsddfs</h4></div>
+  </div></section>
+</body></html>
+"""
+
+
+class TestPageTitles:
+    """Titles for a site whose <title> is the same on every page."""
+
+    URL = "https://e-ska.kemendag.go.id/home.php/home/news_detil/808"
+
+    def test_takes_the_title_from_the_page_heading(self):
+        parsed = PageParser(E_SKA).parse(ESKA_CIRCULAR, self.URL)
+        assert parsed.title == "Edaran Pemberlakuan e-SKA Form E Untuk Barang Ekspor Indonesia ke China"
+
+    def test_takes_the_active_menu_item_on_a_page_without_a_heading(self):
+        html = ESKA_CIRCULAR.replace('"cool-link active"', '"cool-link"').replace(
+            '<li class="cool-link"><a href="/home.php/home/faq">', '<li class="cool-link active"><a href="#">'
+        )
+        assert PageParser(E_SKA).parse(html, self.URL).title == "FAQ"
+
+    def test_falls_back_to_the_cleaned_site_title(self):
+        html = ESKA_CIRCULAR.replace("<h3>Edaran Pemberlakuan", "<p>Edaran Pemberlakuan")
+        assert PageParser(E_SKA).parse(html, self.URL).title == "E-Ska (Electronic Certificate of Origin Service)"
+
+    def test_drops_the_latest_news_column(self):
+        text = PageParser(E_SKA).parse(ESKA_CIRCULAR, self.URL).text
+        assert "Berita Terakhir" not in text and "fsddfs" not in text
+
+    def test_commented_out_markup_never_becomes_text(self):
+        text = PageParser(E_SKA).parse(ESKA_CIRCULAR, self.URL).text
+        assert "PHP Error" not in text and "Tonton" not in text
+
+    def test_attachment_links_move_to_the_canonical_origin(self):
+        parsed = PageParser(E_SKA).parse(ESKA_CIRCULAR, self.URL)
+        assert parsed.attachments == [
+            ("SE Direktur Fasilitasi Ekspor dan Impor", "https://e-ska.kemendag.go.id/uploads/SE700.pdf")
+        ]
+
+    @pytest.mark.parametrize(
+        ("href", "expected"),
+        [
+            ("../uploads/SE700.pdf", "https://e-ska.kemendag.go.id/uploads/SE700.pdf"),
+            ("../cms.php/home/view_file_upload/SE.pdf",
+             "https://e-ska.kemendag.go.id/cms.php/home/view_file_upload/SE.pdf"),
+        ],
+    )
+    def test_relative_downloads_resolve_where_the_server_keeps_them(self, href, expected):
+        assert SiteUrl(E_SKA).normalise(href, "https://e-ska.kemendag.go.id/home.php/home/x") == expected
+
+
+class TestSitePlans:
+    """Details of individual site plans."""
+
+    def test_zero_width_spaces_never_split_a_word(self):
+        html = "<html><head><title>PADG</title></head><body><p>Peraturan An​ggota Dewan</p></body></html>"
+        url = "https://www.bi.go.id/id/publikasi/peraturan/Pages/PADG_162026.aspx"
+        assert "Peraturan Anggota Dewan" in PageParser(BANK_INDONESIA).parse(html, url).text
+
+    def test_lpei_drops_the_contact_form_every_product_repeats(self):
+        html = (
+            '<html><head><title>PMKE | Lembaga Pembiayaan Ekspor Indonesia (Eximbank)</title></head><body>'
+            '<section class="product-wrapper"><div id="div-overview">Fasilitas Pembiayaan Modal Kerja '
+            'Ekspor untuk pengadaan bahan baku dan bahan penolong bagi eksportir.</div>'
+            '<div id="div-apply">Nama Lengkap Email Telepon Kirim Pesan</div></section></body></html>'
+        )
+        parsed = PageParser(LPEI).parse(html, "https://www.indonesiaeximbank.go.id/product-services/pmke")
+        assert parsed.title == "PMKE"
+        assert "Modal Kerja" in parsed.text and "Kirim Pesan" not in parsed.text
+
+
+class TestKemendagDirectorates:
+    """The directorate sites share a plan; robots.txt differs per site."""
+
+    def test_daglu_never_downloads_what_its_robots_txt_forbids(self):
+        assert not SiteUrl(DAGLU).is_wanted_attachment("https://ditjendaglu.kemendag.go.id/storage/a.pdf")
+
+    def test_pen_downloads_documents(self):
+        assert SiteUrl(PEN).is_wanted_attachment("https://ditjenpen.kemendag.go.id/storage/a.pdf")
+
+    def test_faq_spans_its_pages(self):
+        assert DAGLU.sections[0].fixed_urls[-1] == "https://ditjendaglu.kemendag.go.id/faq?page=6"
 
 
 class _Response:
