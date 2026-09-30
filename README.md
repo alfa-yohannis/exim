@@ -54,7 +54,7 @@ URL dan robots.txt diperiksa pada 28–29 September 2026. Crawler-nya
 `app/crawler.py`, dengan rencana per situs di `app/crawl_sites.py`. Sudah
 di-crawl: Bea Cukai (`--site beacukai`), JDIH Kemenkeu (`jdih-kemenkeu`),
 Ditjen Daglu (`daglu`), e-SKA (`e-ska`), Ditjen PEN (`pen`), Bank Indonesia
-(`bi`), dan LPEI (`lpei`); situs lain menyusul.
+(`bi`), LPEI (`lpei`), dan BPOM (`bpom`, `e-bpom`); situs lain menyusul.
 Hasilnya masuk ke `corpus-exim\<Negara>\<Situs>\<Bagian>\`, sehingga filter
 folder di antarmuka menjadi filter per negara. Lihat
 [Berjalan di latar belakang](#berjalan-di-latar-belakang) dan
@@ -76,7 +76,7 @@ folder di antarmuka menjadi filter per negara. Lihat
 | # | Situs | Titik awal | Yang diambil | Perkiraan berkas | Cara |
 |---|---|---|---|---|---|
 | 7 | Badan Karantina Indonesia | https://karantinaindonesia.go.id/sitemap.xml · https://jdih.karantinaindonesia.go.id | Persyaratan karantina hewan, ikan, dan tumbuhan untuk ekspor dan impor. Halaman `/tanya-karantina` dirender JavaScript | ±100 *(kasar)* | HTTP, Chrome untuk Tanya Karantina |
-| 8 | BPOM | https://www.pom.go.id/layanan · https://jdih.pom.go.id | Surat Keterangan Impor (SKI) pangan olahan, obat, kosmetik, suplemen | ±50 *(kasar)* | HTTP |
+| 8 | BPOM | https://jdih.pom.go.id (pencarian perihal "pemasukan", "impor", "ekspor") · https://e-bpom.pom.go.id | Khusus ekspor-impor. JDIH: peraturan pengawasan pemasukan obat dan makanan, SKI, jalur khusus (SAS), daftar barang yang dibatasi pemasukannya, SKE pangan olahan, impor-ekspor narkotika dan prekursor; tiap peraturan dengan halaman metadata (status berlaku) dan PDF-nya, tanpa terjemahan Inggris dan naskah urgensi. Server PDF-nya tidak menyebut tipe berkas, jadi PDF dikenali dari bita awalnya. e-BPOM: FAQ SKI, SKE, rekomendasi impor, INSW, dan layanan post border, serta standar pelayanan, formulir, dan FAQ SAS; daftar perusahaan prioritas dan materi usang dilewati. Registrasi, label, dan iklan tidak diambil. Export Consultation Desk (kerjasamahumas.pom.go.id/ecd) memasang pemeriksaan bot, tidak diambil | 179 — sudah (85 halaman + 94 PDF) | HTTP |
 | 9 | BSN | https://www.bsn.go.id | Daftar SNI wajib dan penilaian kesesuaian | ±30 *(kasar)* | HTTP |
 | 10 | Kemenperin | https://jdih.kemenperin.go.id · https://kemenperin.go.id | Pertimbangan teknis impor, pemberlakuan SNI wajib | ±150 *(kasar)* | HTTP |
 | 11 | Kementan | https://jdih.pertanian.go.id | RIPH dan rekomendasi impor produk pertanian | ±50 *(kasar)* | HTTP |
@@ -258,7 +258,7 @@ python main.py ask "..." --folder "1. Budaya Mutu" --backend claude_cli
 python main.py status                # ukuran indeks dan kesiapan backend
 python main.py hash-password         # buat hash kata sandi admin/guest baru untuk .env
 python main.py crawl --site beacukai --full --no-ingest  # salin satu situs sumber ke corpus-exim
-# --site: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei, cong-bao
+# --site: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei, bpom, e-bpom, cong-bao
 python main.py crawl --site beacukai --sections Impor,FAQ --limit 5  # sampel kecil, lalu indeks
 ```
 

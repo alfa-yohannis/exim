@@ -49,8 +49,67 @@ _TRADE_VERBS = {
     "Vietnam": ("nhập khẩu", "xuất khẩu"),
 }
 
+#: Letters only Vietnamese writes: the breve, horn and stroke letters, and
+#: vowels carrying a dot below, a hook above or a tilde.
+_VIETNAMESE_LETTERS = re.compile(
+    r"[ăđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịĩọỏốồổỗộớờởỡợụủũứừửữựỳỵỷỹ]", re.IGNORECASE
+)
+
+#: Indonesian function words, common in a question and absent from English
+#: and Vietnamese ones.
+_INDONESIAN_WORDS = frozenset({
+    "yang", "dan", "untuk", "apa", "apakah", "bagaimana", "berapa", "dengan",
+    "dari", "adalah", "saja", "ini", "itu", "atau", "tidak", "bisa", "harus",
+    "perlu", "diperlukan", "kapan", "siapa", "mengapa", "cara", "agar", "jika",
+    "bila", "sudah", "belum", "oleh", "pada", "dalam", "ke", "di", "saya",
+})
+
 #: Sends chat messages to a model and returns its reply.
 Completion = Callable[[list[dict[str, str]]], str]
+
+
+def written_in(question: str) -> str | None:
+    """Return the country whose document language ``question`` is written in.
+
+    A rough reading, enough to tell the two document languages apart: any
+    Vietnamese letter means Vietnamese, two Indonesian function words mean
+    Indonesian, and anything else (English, most often) is None.
+    """
+    if _VIETNAMESE_LETTERS.search(question):
+        return "Vietnam"
+    words = set(re.findall(r"[a-z]+", question.lower()))
+    return "Indonesia" if len(words & _INDONESIAN_WORDS) >= 2 else None
+
+
+#: An HS code with its label, as a restatement writes one: "mã HS 0902.00.10",
+#: "HS code 0901", "kode HS 0901.21", or a bare dotted code such as "0901.11".
+_HS_CODE = re.compile(
+    r"(?:\b(?:mã\s+HS|HS\s+code|kode\s+HS|HS)\s*:?\s*)?"
+    r"(?:\b\d{4}(?:\.\d{2}){1,3}\b|(?<=HS )\d{4,10}\b|(?<=HS: )\d{4,10}\b)",
+    re.IGNORECASE,
+)
+
+
+def without_invented_codes(query: str, question: str) -> str:
+    """Return ``query`` without the HS codes ``question`` never mentioned.
+
+    Told in its prompt never to add numbers, the model still did: on 30
+    September 2026 "What are the requirements to import coffee into Viet
+    Nam?" came back ending in "mã HS 0902.00.10", the heading for tea. A code
+    in the search wording draws documents about that code, so an invented one
+    is removed here rather than trusted to the prompt.
+    """
+    asked = set(re.findall(r"\d+", question))
+
+    def drop_unless_asked(match: re.Match) -> str:
+        digits = re.findall(r"\d+", match.group(0))
+        return match.group(0) if digits and all(number in asked for number in digits) else ""
+
+    cleaned = _HS_CODE.sub(drop_unless_asked, query)
+    # Tidy what a removed code leaves behind: a dangling comma or colon, doubled spaces.
+    cleaned = re.sub(r"\s*,\s*(?=,|$|\.$)", "", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip(" ,;:")
 
 
 def keep_direction(query: str, country: str, direction: str | None) -> str:
@@ -164,6 +223,17 @@ class CountryQueryRewriter:
         """True when ``country`` has documents in a known language to restate for."""
         return bool(self._settings.query_rewrite_enabled and country in DOCUMENT_LANGUAGES)
 
+    def needed_for(self, question: str, country: str | None) -> bool:
+        """True when ``question`` should be restated before ``country``'s documents are searched.
+
+        A question already in the language of those documents is searched as
+        typed. Restated anyway, it gained terms the question never used: on 30
+        September 2026 "Apa itu impor untuk dipakai…" came back padded with SKI
+        and health certificates, the search drew BPOM regulations instead of
+        the customs rule, and the answer defined the term wrongly.
+        """
+        return self.supports(country) and written_in(question) != country
+
     def rewrite(self, question: str, country: str) -> str:
         """Return ``question`` restated for ``country``'s regulations.
 
@@ -180,7 +250,9 @@ class CountryQueryRewriter:
         except Exception as error:
             LOGGER.warning("Pertanyaan tidak dapat dirumuskan ulang untuk %s: %s", country, error)
             return question
-        restated = keep_direction(self._clean(reply), country, trade_direction(question, country))
+        restated = keep_direction(
+            without_invented_codes(self._clean(reply), question), country, trade_direction(question, country)
+        )
         if not restated:
             return question
         LOGGER.info("Pertanyaan untuk %s dirumuskan ulang: %r", country, restated)

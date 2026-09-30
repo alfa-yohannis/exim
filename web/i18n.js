@@ -286,6 +286,9 @@ const INTERFACE_TEXTS = {
     'app.documentStatus.failed': 'Gagal',
     'app.scannedPages': '{count} halaman hasil pindai',
     'app.show': 'Tampilkan',
+    'section.page': 'Halaman {number}',
+    'section.document': 'Dokumen',
+    'section.text': 'Teks',
   },
 
   /* -------------------------------------------------------------- English */
@@ -558,6 +561,9 @@ const INTERFACE_TEXTS = {
     'app.documentStatus.failed': 'Failed',
     'app.scannedPages': '{count} scanned pages',
     'app.show': 'Show',
+    'section.page': 'Page {number}',
+    'section.document': 'Document',
+    'section.text': 'Text',
   },
 
   /* ----------------------------------------------------------- Tiếng Việt */
@@ -830,6 +836,9 @@ const INTERFACE_TEXTS = {
     'app.documentStatus.failed': 'Lỗi',
     'app.scannedPages': '{count} trang quét',
     'app.show': 'Hiển thị',
+    'section.page': 'Trang {number}',
+    'section.document': 'Tài liệu',
+    'section.text': 'Văn bản',
   },
 };
 
@@ -900,6 +909,20 @@ class InterfaceLanguage {
   countryName(folderName) {
     const key = `country.${folderName}`;
     return key in this.texts.id ? this.t(key) : folderName;
+  }
+
+  /**
+   * A passage's place in its document in the active language.
+   *
+   * The index stores it in Indonesian, as "Halaman 28", "Halaman 3 (OCR)",
+   * "Dokumen" or "Teks"; anything else is shown as stored.
+   */
+  sectionLabel(label) {
+    const page = /^Halaman (\d+)( \(OCR\))?$/.exec(label || '');
+    if (page) return this.t('section.page', { number: page[1] }) + (page[2] || '');
+    if (label === 'Dokumen') return this.t('section.document');
+    if (label === 'Teks') return this.t('section.text');
+    return label || '';
   }
 
   /** Writes the active language's text into every marked element under `root`. */

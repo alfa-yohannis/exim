@@ -394,6 +394,106 @@ BANK_INDONESIA = CrawlSite(
     ),
 )
 
+# --- BPOM: import and export of drugs and food ------------------------------------
+#
+# Only what concerns importing and exporting: BPOM's import control (SKI, the
+# Special Access Scheme, restricted goods) and its export letters (SKE). Its
+# registration, labelling and advertising rules are left out.
+
+_JDIH_POM_ROOT = "https://jdih.pom.go.id"
+
+#: The search takes its filters as path segments: token, number, year, subject,
+#: category, access, then the page. The token is the one every link on the site
+#: carries; "all" leaves a filter open.
+_JDIH_POM_SEARCH = f"{_JDIH_POM_ROOT}/rule/search/c92a10324374fac681719d63979d00fe"
+
+
+def _jdih_pom_subject(word: str) -> str:
+    """Return the JDIH BPOM search for documents whose subject contains ``word``."""
+    return f"{_JDIH_POM_SEARCH}/all/all/{word}/all/all"
+
+
+BPOM = CrawlSite(
+    key="bpom",
+    country="Indonesia",
+    folder="BPOM",
+    root=_JDIH_POM_ROOT,
+    hosts=frozenset({"jdih.pom.go.id"}),
+    # The detail block: title, number, dates, subject, status, related files.
+    content_selectors=("section.contact-section", "body"),
+    # Every page's <title> is the site's name; the regulation's own title is
+    # the value beside "Judul :", the first row of the detail block.
+    title_selectors=("section.contact-section .col-md-5 > div:first-of-type > span:last-child",),
+    # Downloads carry the document's title in the path, without an extension,
+    # and the server declares no type: the fetcher recognises the PDF itself.
+    attachment_path_patterns=(r"^/download/rule/",),
+    # "Naskah Urgensi" and "Risalah Rapat" are drafting papers, not the rule;
+    # an official English translation repeats the Indonesian text.
+    attachment_exclude_patterns=(
+        r"^/download/detilprod/",
+        r"^/download/rule/\d+/[^/]+/\d{4}/(?:Regulation|Decree)(?:%20|\s)",
+    ),
+    sections=(
+        CrawlSection(
+            folder="Peraturan",
+            # Import control (pemasukan, impor, importasi, SKI, Special Access
+            # Scheme) and export (ekspor, SKE). The subject search matches
+            # inside words, so "impor" also finds "importasi".
+            listing_urls=tuple(_jdih_pom_subject(word) for word in ("pemasukan", "impor", "ekspor")),
+            detail_pattern=r"^/view/slide/\d+/[^/]+/\d{4}/[0-9a-f]{32}$",
+            # Results run ten to a page, numbered in the path from 1.
+            page_url_template="{stem}/{number}",
+            # Official English translations are listed as documents of their
+            # own; the Indonesian original says the same and is the one in force.
+            title_pattern=r"^(?!(?:Regulation|Decree|Circular Letter)\b)",
+            sample_limit_per_listing=10,
+        ),
+    ),
+)
+
+_E_BPOM_ROOT = "https://e-bpom.pom.go.id"
+
+E_BPOM = CrawlSite(
+    key="e-bpom",
+    country="Indonesia",
+    folder="BPOM",
+    root=_E_BPOM_ROOT,
+    hosts=frozenset({"e-bpom.pom.go.id"}),
+    # The panels' relative links are written for the page that loads them, at
+    # the site root, not for the fragment's own address.
+    path_rewrites=((r"^/tpl/content/etc/", "/etc/"),),
+    # The permit application loads its information panels as HTML fragments;
+    # they are read directly, since the page that shows them is a login shell.
+    content_selectors=("body",),
+    title_selectors=("td.main-content-title",),
+    attachment_exclude_patterns=(
+        # Priority-service decrees only list companies; the officials' list
+        # and the regional slides say nothing an importer needs.
+        r"/sk_(?:ski)?prioritas", r"/pejabat\.pdf$", r"/surabaya\.",
+        # Outdated: the 2009 single-window rollout, 2012 briefings, the 2017
+        # tariff-book notice, and slides on the revoked 2017 regulations.
+        r"/pintar\.pdf$", r"/sosialiasi2728\.pdf$", r"/Pengumuman_BTKI_2017\.pdf$",
+        r"/Materi_Sosialisasi_Perka_BPOM_29_dan_30\.pdf$",
+    ),
+    sections=(
+        CrawlSection(
+            folder="e-BPOM",
+            fixed_urls=(
+                # Questions and answers on SKI, import recommendations for
+                # drug, food, cosmetic and supplement ingredients, INSW, and
+                # post-border export and import services, SKE included.
+                f"{_E_BPOM_ROOT}/tpl/content/faq.php",
+                # Service standards, application forms, circulars, and the
+                # Special Access Scheme and SKI/SKE/SAS cosmetics FAQs. The
+                # regulations it also lists come from JDIH BPOM, with status.
+                f"{_E_BPOM_ROOT}/tpl/content/download.php",
+            ),
+            paginate=False,
+            sample_attachment_limit=40,
+        ),
+    ),
+)
+
 # --- Vietnam: Công báo (Official Gazette) ------------------------------------------
 
 _CONG_BAO_ROOT = "https://congbao.chinhphu.vn"
@@ -536,6 +636,7 @@ PAJAK = CrawlSite(
 SITES: dict[str, CrawlSite] = {
     site.key: site
     for site in (
-        BEA_CUKAI, JDIH_KEMENKEU, DAGLU, E_SKA, PEN, BANK_INDONESIA, LPEI, PAJAK, CONG_BAO,
+        BEA_CUKAI, JDIH_KEMENKEU, DAGLU, E_SKA, PEN, BANK_INDONESIA, LPEI, BPOM, E_BPOM, PAJAK,
+        CONG_BAO,
     )
 }

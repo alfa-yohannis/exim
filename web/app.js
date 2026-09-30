@@ -1453,7 +1453,7 @@ class AnswerRenderer {
         <span class="source-number">${citation.citation_number}</span>
         <span class="source-name">${this.escaper.escape(citation.document_name)}</span>
       </div>
-      <div class="source-meta">${this.escaper.escape(citation.relative_path)} · ${this.escaper.escape(citation.section_label)}</div>
+      <div class="source-meta">${this.escaper.escape(citation.relative_path)} · ${this.escaper.escape(interfaceLanguage.sectionLabel(citation.section_label))}</div>
       <div class="badge-row">${badges}${ocrBadge}<span class="badge">${this.escaper.escape(t('app.score', { score: citation.relevance_score }))}</span></div>
       ${externalRow}
       <div class="source-excerpt">${this.escaper.escape(citation.excerpt)}</div>
@@ -1474,7 +1474,7 @@ class AnswerRenderer {
       // Assigned as properties so the text needs no HTML escaping.
       button.dataset.excerpt = citation.excerpt || '';
       button.dataset.documentName = citation.document_name || '';
-      button.dataset.sectionLabel = citation.section_label || '';
+      button.dataset.sectionLabel = interfaceLanguage.sectionLabel(citation.section_label);
       button.addEventListener('click', this.handleSourceAction.bind(this));
     }
     return card;
@@ -1563,7 +1563,7 @@ class AnswerRenderer {
   buildAnswerWithSources() {
     if (this.citations.length === 0) return this.accumulatedText;
     const lines = this.citations.map((citation) =>
-      `[${citation.citation_number}] ${citation.document_name} — ${citation.section_label}\n` +
+      `[${citation.citation_number}] ${citation.document_name} — ${interfaceLanguage.sectionLabel(citation.section_label)}\n` +
       `    ${citation.relative_path}`);
     return `${this.accumulatedText}\n\n${t('app.sourcesHeading')}\n${lines.join('\n')}`;
   }
@@ -1913,7 +1913,7 @@ class BrowsePanel {
       if (!passage) return;
       button.dataset.passageText = passage.text || '';
       button.dataset.documentName = passage.document_name || '';
-      button.dataset.sectionLabel = passage.section_label || '';
+      button.dataset.sectionLabel = interfaceLanguage.sectionLabel(passage.section_label);
       button.dataset.relativePath = passage.relative_path || '';
       button.addEventListener('click', this.handleCopyPassage.bind(this));
     });
@@ -1951,7 +1951,7 @@ class BrowsePanel {
           <span class="source-name">${this.escaper.escape(passage.document_name)}</span>
           ${ocrBadge}
         </div>
-        <div class="source-meta">${this.escaper.escape(passage.relative_path)} · ${this.escaper.escape(passage.section_label)}</div>
+        <div class="source-meta">${this.escaper.escape(passage.relative_path)} · ${this.escaper.escape(interfaceLanguage.sectionLabel(passage.section_label))}</div>
         <div class="source-excerpt">${this.escaper.escape(passage.text)}</div>
         <div class="passage-footer">
           <span class="passage-scores">${scoreParts.map((part) => this.escaper.escape(part)).join(' · ')}</span>

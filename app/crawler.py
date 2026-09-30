@@ -30,6 +30,7 @@ seconds.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import logging
 import re
@@ -405,6 +406,13 @@ class PoliteFetcher:
         "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
     }
 
+    #: Types that say nothing about the file, so its first bytes decide.
+    UNDECLARED_TYPES = frozenset({"", "application/octet-stream"})
+
+    #: Opening bytes of the documents recognisable without a declared type.
+    #: Only PDF: DOCX, XLSX and PPTX all open as a ZIP archive.
+    FILE_SIGNATURES = {b"%PDF-": ".pdf"}
+
     #: Intermediate certificates some government servers leave out of the
     #: chain they send. Browsers fetch those themselves; requests cannot.
     EXTRA_CERTIFICATES = Path(__file__).with_name("certificates") / "intermediates.pem"
@@ -481,8 +489,12 @@ class PoliteFetcher:
             RuntimeError: on failure, or when the file exceeds ``maximum_bytes``.
         """
         response = self._request(url, stream=True)
+        blocks = response.iter_content(chunk_size=256 * 1024)
         try:
-            target = target_for(self._filename_of(response, url))
+            # Read before naming: a server that declares no type is recognised
+            # by the file's first bytes.
+            first_block = next(blocks, b"")
+            target = target_for(self._filename_of(response, url, first_block))
         except UnsupportedAttachment:
             response.close()
             raise
@@ -490,7 +502,7 @@ class PoliteFetcher:
         written = 0
         try:
             with open(partial, "wb") as handle:
-                for block in response.iter_content(chunk_size=256 * 1024):
+                for block in itertools.chain((first_block,), blocks):
                     written += len(block)
                     if written > maximum_bytes:
                         raise RuntimeError(
@@ -503,12 +515,16 @@ class PoliteFetcher:
             partial.unlink(missing_ok=True)
         return target, written
 
-    def _filename_of(self, response, url: str) -> str:
+    def _filename_of(self, response, url: str, first_bytes: bytes = b"") -> str:
         """Return the document's filename, with an extension the corpus reads.
 
+        When neither the name nor the declared type says what the file is,
+        ``first_bytes`` do: JDIH BPOM serves its regulation PDFs from
+        extensionless links with no Content-Type at all.
+
         Raises:
-            UnsupportedAttachment: when neither the server nor the URL names a
-                document type the extractors support.
+            UnsupportedAttachment: when neither the server, the URL nor the
+                file's opening bytes name a document type the extractors support.
         """
         disposition = response.headers.get("Content-Disposition", "")
         match = re.search(r"filename\*?=(?:UTF-8'')?\"?([^\";]+)\"?", disposition, re.IGNORECASE)
@@ -521,6 +537,12 @@ class PoliteFetcher:
             return name
         content_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
         declared = self.CONTENT_TYPE_SUFFIXES.get(content_type)
+        if declared is None and content_type in self.UNDECLARED_TYPES:
+            declared = next(
+                (suffix for signature, suffix in self.FILE_SIGNATURES.items()
+                 if first_bytes.startswith(signature)),
+                None,
+            )
         if declared is None:
             raise UnsupportedAttachment(content_type or "tipe tidak diketahui")
         return f"{Path(name).stem or 'lampiran'}{declared}"

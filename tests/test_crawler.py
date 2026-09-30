@@ -7,13 +7,14 @@ what would be fetched and what would be written while staying offline.
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from app import crawler as crawler_module
-from app.crawl_sites import BANK_INDONESIA, BEA_CUKAI, DAGLU, E_SKA, LPEI, PAJAK, PEN
+from app.crawl_sites import BANK_INDONESIA, BEA_CUKAI, BPOM, DAGLU, E_BPOM, E_SKA, LPEI, PAJAK, PEN
 from app.crawler import (
     CorpusPageWriter,
     CrawlSection,
@@ -216,11 +217,83 @@ class TestKemendagDirectorates:
         assert DAGLU.sections[0].fixed_urls[-1] == "https://ditjendaglu.kemendag.go.id/faq?page=6"
 
 
+class TestBpom:
+    """BPOM's legal database and its permit service, export and import only."""
+
+    VIEW = "https://jdih.pom.go.id/view/slide/1746/6/2026/c92a10324374fac681719d63979d00fe"
+    DOWNLOAD = "https://jdih.pom.go.id/download/rule/1746/6/2026/Peraturan%20Nomor%206%20Tahun%202026"
+
+    def test_a_regulation_page_is_a_detail_page_and_its_preview_is_not(self):
+        pattern = re.compile(BPOM.sections[0].detail_pattern)
+        assert pattern.match(SiteUrl.path_of(self.VIEW))
+        assert not pattern.match(SiteUrl.path_of(self.VIEW.replace("/view/", "/preview/")))
+
+    def test_the_second_page_of_results_is_numbered_in_the_path(self):
+        section = BPOM.sections[0]
+        listing = section.listing_urls[0]
+        assert listing.endswith("/all/all/pemasukan/all/all")
+        assert SiteCrawler._listing_page_url(listing, section, 1, SiteUrl(BPOM)) == f"{listing}/2"
+
+    def test_the_title_is_the_regulation_not_the_site(self):
+        html = (
+            "<html><head><title>JDIH Biro Hukum dan Organisasi - Badan POM RI</title></head><body>"
+            '<section class="ftco-section contact-section"><div class="col-md-5">'
+            '<h2>Detil Peraturan</h2><div><span>Judul :</span> <span>Peraturan Badan Pengawas Obat '
+            "dan Makanan Nomor 6 Tahun 2026 tentang Tata Cara Penerbitan Surat Keterangan Ekspor "
+            "Pangan Olahan</span></div><div><span>Status:</span> <span>Berlaku</span></div>"
+            "</div></section></body></html>"
+        )
+        parsed = PageParser(BPOM).parse(html, self.VIEW)
+        assert parsed.title.startswith("Peraturan Badan Pengawas Obat dan Makanan Nomor 6 Tahun 2026")
+        assert "Status: Berlaku" in parsed.text
+
+    def test_an_english_translation_is_out_of_scope(self):
+        pattern = BPOM.sections[0].title_pattern
+        assert not re.search(pattern, "Regulation of the Indonesian Food and Drug Authority Number 28 of 2023")
+        assert re.search(pattern, "Peraturan Badan Pengawas Obat dan Makanan Nomor 28 Tahun 2023")
+
+    def test_takes_the_regulation_but_not_drafting_papers_or_translations(self):
+        urls = SiteUrl(BPOM)
+        assert urls.is_wanted_attachment(self.DOWNLOAD)
+        assert not urls.is_wanted_attachment("https://jdih.pom.go.id/download/detilprod/1746/0")
+        assert not urls.is_wanted_attachment(
+            "https://jdih.pom.go.id/download/rule/1611/28/2023/Regulation%20Of%20The%20Indonesia"
+        )
+
+    def test_e_bpom_links_resolve_against_the_application_root(self):
+        link = SiteUrl(E_BPOM).normalise("etc/doc/faster.pdf", "https://e-bpom.pom.go.id/tpl/content/download.php")
+        assert link == "https://e-bpom.pom.go.id/etc/doc/faster.pdf"
+
+    def test_e_bpom_leaves_out_company_lists_and_outdated_files(self):
+        urls = SiteUrl(E_BPOM)
+        assert urls.is_wanted_attachment("https://e-bpom.pom.go.id/etc/doc/form_pengajuan_ski_otsk.pdf")
+        assert not urls.is_wanted_attachment("https://e-bpom.pom.go.id/etc/doc/sk_prioritas8pangan.pdf")
+        assert not urls.is_wanted_attachment("https://e-bpom.pom.go.id/etc/doc/pintar.pdf")
+
+    def test_both_write_into_one_bpom_folder(self):
+        assert (BPOM.country, BPOM.folder) == (E_BPOM.country, E_BPOM.folder) == ("Indonesia", "BPOM")
+
+
 class _Response:
     """Just the headers of an HTTP response."""
 
     def __init__(self, headers: dict[str, str]) -> None:
         self.headers = headers
+
+
+class _StreamedResponse(_Response):
+    """Headers and a body served in blocks, as a streamed download."""
+
+    def __init__(self, headers: dict[str, str], blocks: list[bytes]) -> None:
+        super().__init__(headers)
+        self._blocks = blocks
+        self.closed = False
+
+    def iter_content(self, chunk_size: int):
+        yield from self._blocks
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class TestAttachmentFilename:
@@ -248,6 +321,35 @@ class TestAttachmentFilename:
         stream = "https://g7.cdnchinhphu.vn/api/download/stream?Url=x&file_name=2026_523_136%2F2026%2FTT-BTC.docx"
         name = fetcher._filename_of(_Response({"Content-Type": "application/octet-stream"}), stream)
         assert name == "2026_523_136-2026-TT-BTC.docx"
+
+    def test_recognises_an_undeclared_pdf_by_its_first_bytes(self, fetcher):
+        """JDIH BPOM sends its regulation PDFs with no Content-Type at all."""
+        link = "https://jdih.pom.go.id/download/rule/1746/6/2026/Peraturan%20Nomor%206%20Tahun%202026"
+        name = fetcher._filename_of(_Response({}), link, b"%PDF-1.7\n%\xe2\xe3")
+        assert name == "Peraturan Nomor 6 Tahun 2026.pdf"
+
+    def test_a_generic_type_is_decided_by_the_first_bytes_too(self, fetcher):
+        response = _Response({"Content-Type": "application/octet-stream"})
+        assert fetcher._filename_of(response, self.DOWNLOAD, b"%PDF-1.4") == "abc123.pdf"
+
+    def test_an_undeclared_file_that_is_not_a_pdf_is_refused(self, fetcher):
+        with pytest.raises(UnsupportedAttachment):
+            fetcher._filename_of(_Response({}), self.DOWNLOAD, b"<!DOCTYPE html>")
+
+    def test_a_declared_type_is_not_second_guessed(self, fetcher):
+        with pytest.raises(UnsupportedAttachment):
+            fetcher._filename_of(_Response({"Content-Type": "text/html"}), self.DOWNLOAD, b"%PDF-1.4")
+
+    def test_downloads_an_undeclared_pdf_whole(self, fetcher, monkeypatch, tmp_path):
+        """The block read to recognise the file is written, not lost."""
+        response = _StreamedResponse({}, [b"%PDF-1.7 first", b" second", b" third"])
+        monkeypatch.setattr(fetcher, "_request", lambda url, stream: response)
+        target, size = fetcher.download(
+            "https://jdih.pom.go.id/download/rule/1/6/2026/Peraturan", lambda name: tmp_path / name, 10_000
+        )
+        assert target == tmp_path / "Peraturan.pdf"
+        assert target.read_bytes() == b"%PDF-1.7 first second third" and size == 27
+        assert response.closed
 
     def test_a_server_name_with_slashes_keeps_its_number(self, fetcher):
         response = _Response({"Content-Disposition": 'attachment; filename="136/2026/TT-BTC.docx"'})

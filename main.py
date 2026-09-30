@@ -86,7 +86,8 @@ class CommandLineInterface:
             default="beacukai",
             help=(
                 "Situs yang diambil (bawaan: beacukai). "
-                "Pilihan: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei, pajak, cong-bao"
+                "Pilihan: beacukai, jdih-kemenkeu, daglu, e-ska, pen, bi, lpei, bpom, e-bpom, pajak, "
+                "cong-bao"
             ),
         )
         crawl_parser.add_argument(

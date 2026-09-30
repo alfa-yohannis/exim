@@ -435,10 +435,11 @@ class RagEngine:
             LOGGER.info("Pertanyaan lanjutan diperluas untuk pencarian: %r", search_query)
 
         # One country's documents are searched in that country's language and
-        # from its side of the trade: see app.query_rewriting.
+        # from its side of the trade: see app.query_rewriting. A question
+        # already in that language is searched as typed.
         country = request.folder_filter
         restated_query = None
-        if self._query_rewriter is not None and self._query_rewriter.supports(country):
+        if self._query_rewriter is not None and self._query_rewriter.needed_for(search_query, country):
             yield StreamEvent("status", {"message": self._prompt_builder.status_message(
                 "restating", request.language,
                 country=self._prompt_builder.country_name(country, request.language),

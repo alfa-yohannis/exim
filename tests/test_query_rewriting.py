@@ -7,7 +7,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.query_rewriting import CountryQueryRewriter, keep_direction, trade_direction
+from app.query_rewriting import (
+    CountryQueryRewriter,
+    keep_direction,
+    trade_direction,
+    without_invented_codes,
+)
 
 
 class _RecordingModel:
@@ -73,6 +78,56 @@ def test_restates_only_for_countries_whose_document_language_is_known(isolated_s
     rewriter = CountryQueryRewriter(isolated_settings, complete=_RecordingModel())
     assert rewriter.supports("Indonesia") and rewriter.supports("Vietnam")
     assert not rewriter.supports(None) and not rewriter.supports("Filipina")
+
+
+@pytest.mark.parametrize(
+    ("question", "country", "needed"),
+    [
+        ("Apa itu impor untuk dipakai dan dokumen apa yang diperlukan?", "Indonesia", False),
+        ("Thủ tục hải quan đối với hàng hóa xuất khẩu gồm những bước nào?", "Vietnam", False),
+        ("Apa syarat ekspor kopi ke Vietnam?", "Vietnam", True),
+        ("Tôi muốn xuất khẩu cà phê sang Indonesia. Cần những giấy tờ gì?", "Indonesia", True),
+        ("What documents do I need to export coffee from Indonesia?", "Indonesia", True),
+        ("What documents do I need to export coffee from Indonesia?", None, False),
+    ],
+)
+def test_restates_only_a_question_in_another_language(isolated_settings, question, country, needed):
+    """Restated in its own language, a question gained terms it never used."""
+    rewriter = CountryQueryRewriter(isolated_settings, complete=_RecordingModel())
+    assert rewriter.needed_for(question, country) is needed
+
+
+@pytest.mark.parametrize(
+    ("restated", "question", "expected"),
+    [
+        (
+            "Yêu cầu nhập khẩu cà phê vào Việt Nam: giấy phép nhập khẩu, thuế nhập khẩu, mã HS 0902.00.10",
+            "What are the requirements to import coffee into Viet Nam?",
+            "Yêu cầu nhập khẩu cà phê vào Việt Nam: giấy phép nhập khẩu, thuế nhập khẩu",
+        ),
+        (
+            "Ketentuan impor kopi HS 0901.11 ke Indonesia",
+            "Syarat impor kopi HS 0901.11 ke Indonesia?",
+            "Ketentuan impor kopi HS 0901.11 ke Indonesia",
+        ),
+        (
+            "Biểu thuế theo Nghị định 26/2023/NĐ-CP, kode HS 0901, năm 2024",
+            "Biểu thuế nhập khẩu năm 2024?",
+            "Biểu thuế theo Nghị định 26/2023/NĐ-CP, năm 2024",
+        ),
+    ],
+)
+def test_drops_hs_codes_the_question_never_mentioned(restated, question, expected):
+    """The model added "mã HS 0902.00.10", the heading for tea, to a coffee question."""
+    assert without_invented_codes(restated, question) == expected
+
+
+def test_a_restatement_loses_an_invented_code(isolated_settings):
+    model = _RecordingModel("Yêu cầu nhập khẩu cà phê vào Việt Nam, mã HS 0902.00.10")
+    restated = CountryQueryRewriter(isolated_settings, complete=model).rewrite(
+        "What are the requirements to import coffee into Viet Nam?", "Vietnam"
+    )
+    assert restated == "Yêu cầu nhập khẩu cà phê vào Việt Nam"
 
 
 def test_can_be_switched_off(isolated_settings):

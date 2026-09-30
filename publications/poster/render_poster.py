@@ -1,4 +1,4 @@
-"""Render poster_id.html dan poster_en.html menjadi PDF A1 potret, siap cetak.
+"""Render poster_id.html, poster_en.html, dan poster_vi.html menjadi PDF A1 potret, siap cetak.
 
     ..\\..\\.venv\\Scripts\\python.exe render_poster.py          # keduanya
     ..\\..\\.venv\\Scripts\\python.exe render_poster.py en       # satu bahasa saja
@@ -13,7 +13,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 HERE = Path(__file__).resolve().parent
-LANGUAGES = ("id", "en")
+LANGUAGES = ("id", "en", "vi")
 
 PAGE_WIDTH = "594mm"   # A1 potret
 PAGE_HEIGHT = "841mm"

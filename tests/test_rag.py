@@ -254,6 +254,9 @@ class _StubRewriter:
     def supports(self, country):
         return country == "Vietnam"
 
+    def needed_for(self, question, country):
+        return self.supports(country) and "Việt" not in question
+
     def rewrite(self, question, country):
         return self.RESTATED
 
@@ -294,6 +297,13 @@ class TestCountryRules:
         prompt = engine.stub_backend.received_user_prompt
         assert "Jawab hanya tentang ketentuan Vietnam" in prompt
         assert self.QUESTION in prompt
+
+    def test_a_question_already_in_the_document_language_is_searched_as_typed(self, engine):
+        question = "Quy định nhập khẩu cà phê vào Việt Nam là gì?"
+        events = collect_events(engine, QuestionRequest(question, folder_filter="Vietnam"))
+        sources = next(event for event in events if event.name == "sources")
+        assert engine.stub_retriever.received_question == question
+        assert "search_query" not in sources.payload or sources.payload["search_query"] is None
 
     def test_the_answer_is_told_which_side_of_the_trade_applies(self, engine):
         collect_events(engine, QuestionRequest(self.QUESTION, folder_filter="Vietnam"))

@@ -20,7 +20,7 @@ set LOG=data\crawl.log
 
 rem Vietnam first while its corpus is new; then the Indonesian sites, smallest
 rem first, which by now only re-check their listings for new pages.
-for %%S in (cong-bao pen daglu bi e-ska lpei beacukai jdih-kemenkeu) do (
+for %%S in (cong-bao pen daglu e-bpom bi bpom e-ska lpei beacukai jdih-kemenkeu) do (
     echo ===== !date! !time!  %%S pass 1 ===== >> %LOG%
     .venv\Scripts\python.exe main.py crawl --site %%S --full --no-ingest >> %LOG% 2>&1
     echo ===== !date! !time!  %%S pass 2 ===== >> %LOG%
