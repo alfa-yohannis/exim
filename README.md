@@ -265,7 +265,9 @@ python main.py crawl --site beacukai --sections Impor,FAQ --limit 5  # sampel ke
 ### Berjalan di latar belakang
 
 Server dan crawl dijalankan lewat Task Scheduler, sehingga tetap hidup walaupun
-terminal ditutup:
+terminal ditutup. `Exim server` juga mulai sendiri saat pengguna masuk ke
+Windows. Server dijalankan lewat `conhost.exe --headless`, sehingga tidak ada
+jendela konsol yang muncul:
 
 | Task | Skrip | Log |
 |---|---|---|
@@ -281,8 +283,8 @@ Selama server berjalan, berkas baru hasil crawl diindeks sendiri tiap 60 detik
 (`AUTO_INGEST_SECONDS`), jadi crawl selalu dengan `--no-ingest`: indexer kedua
 di proses lain akan menimpa vektor milik server.
 
-`Stop-ScheduledTask` hanya menghentikan pembungkus PowerShell-nya; `cmd` dan
-Python di bawahnya tetap berjalan. Untuk benar-benar menghentikannya:
+`Stop-ScheduledTask` hanya menghentikan pembungkusnya; `cmd` dan Python di
+bawahnya bisa tetap berjalan. Untuk benar-benar menghentikannya:
 
 ```powershell
 Get-CimInstance Win32_Process |

@@ -134,7 +134,7 @@ robots.txt mengizinkan semua (portal dan JDIH).
 - [x] Antarmuka Vietnam/Inggris: label halaman di kartu sumber kini
   diterjemahkan saat ditampilkan ("Trang 28", "Page 28").
 - [x] Poster Indonesia dan Inggris diperbarui ke data 30 September; poster
-  Vietnam ditambahkan (`publications/poster/poster_vi.pdf`).
+  Vietnam ditambahkan (`publications/posters/poster_vi.pdf`).
 
 - [ ] Satu terjemahan Inggris lolos di BPOM ("Important and Exportation of
   Narcotics…"); perluas `title_pattern` bila perlu, lalu buang salinannya.

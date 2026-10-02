@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Poster A1 (ID) — Building Your Own Local AI · Studi kasus ekspor-impor</title>
+<title>Poster A1 (EN) — Building Your Own Local AI · Export-import case study</title>
 <style>
 /* ==========================================================================
    Poster A1 potret (594 × 841 mm) — Asisten Ekspor Impor, studi kasus
@@ -13,7 +13,7 @@
    terbaca sebagai satu hal. Tanpa web font: seluruhnya memakai huruf sistem,
    sehingga hasil cetak identik di komputer mana pun.
 
-   Render:  python render_poster.py id   → poster_id.pdf (A1, siap cetak)
+   Render:  python render_poster.py en   → poster_en.pdf (A1, siap cetak)
    ========================================================================== */
 
 :root {
@@ -71,7 +71,7 @@ body {
 .masthead {
   background: linear-gradient(135deg, #0b4a9a 0%, var(--dark) 55%, var(--dark-deep) 100%);
   color: var(--dark-ink);
-  padding: 24mm 30mm 20mm;
+  padding: 20mm 30mm 16mm;
   border-bottom: 3mm solid var(--gold);
   position: relative;
   overflow: hidden;
@@ -107,7 +107,7 @@ body {
   letter-spacing: 0.30mm;
   text-transform: uppercase;
   color: var(--gold);
-  margin-bottom: 9mm;
+  margin-bottom: 7mm;
 }
 
 .masthead h1 {
@@ -116,7 +116,7 @@ body {
   line-height: 1.02;
   font-weight: 700;
   letter-spacing: -0.55mm;
-  margin-bottom: 8mm;
+  margin-bottom: 6mm;
 }
 
 .masthead .tagline {
@@ -126,7 +126,7 @@ body {
   font-weight: 600;
   letter-spacing: -0.14mm;
   color: var(--gold);
-  margin-bottom: 8mm;
+  margin-bottom: 6mm;
   max-width: 440mm;
 }
 
@@ -167,7 +167,7 @@ h2 + .underline {
   margin-bottom: 6mm;
 }
 
-.block + .block { margin-top: 6.5mm; }
+.block + .block { margin-top: 5.5mm; }
 
 /* ------------------------------------------------------------- daftar */
 
@@ -318,7 +318,7 @@ h2 + .underline {
 .cta {
   background: var(--dark);
   border-radius: 7mm;
-  padding: 10mm 11mm 9mm;
+  padding: 8mm 11mm 7mm;
   text-align: center;
   color: var(--dark-ink);
 }
@@ -329,15 +329,15 @@ h2 + .underline {
   letter-spacing: 0.6mm;
   text-transform: uppercase;
   color: var(--gold);
-  margin-bottom: 8mm;
+  margin-bottom: 6mm;
 }
 
 .qr-frame {
   background: #fff;
   border-radius: 4mm;
   padding: 4.4mm;
-  width: 80mm;
-  margin: 0 auto 7mm;
+  width: 70mm;
+  margin: 0 auto 6mm;
 }
 .qr-frame img { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 
@@ -355,7 +355,7 @@ h2 + .underline {
 .cta hr {
   border: 0;
   border-top: 0.4mm solid rgba(255,255,255,0.18);
-  margin: 9mm 0;
+  margin: 7mm 0;
 }
 
 .creds { display: grid; gap: 4.5mm; text-align: left; }
@@ -379,7 +379,7 @@ h2 + .underline {
 }
 
 .cta-note {
-  margin-top: 8mm;
+  margin-top: 6mm;
   font-size: 6.2mm;
   line-height: 1.4;
   color: var(--dark-ink-2);
@@ -424,11 +424,11 @@ h2 + .underline {
   background: var(--sunken);
   border: 0.5mm solid var(--line);
   border-radius: 4mm;
-  padding: 4.4mm 7mm;
+  padding: 3.4mm 7mm;
 }
 .stat .value {
   font-family: var(--display);
-  font-size: 16.5mm;
+  font-size: 15mm;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.3mm;
@@ -526,70 +526,70 @@ h2 + .underline {
 <body>
 
 <header class="masthead">
-  <div class="brand"><img src="pradita-logo.png" alt="Logo Universitas Pradita"></div>
-  <div class="kicker">Fakultas Sains dan Teknologi &middot; Universitas Pradita</div>
+  <div class="brand"><img src="pradita-logo.png" alt="Pradita University logo"></div>
+  <div class="kicker">Faculty of Science and Technology &middot; Pradita University</div>
   <h1>Building Your Own Local AI</h1>
   <p class="tagline">Empower your organization's document search with AI</p>
-  <p>Studi kasus independen atas informasi publik ekspor-impor
-     <b>Indonesia</b> dan <b>Vietnam</b>, dari Bea Cukai, Kemenkeu, Kemendag,
-     dan BPOM hingga Công báo Vietnam. Tanyakan apa saja dengan bahasa
-     sehari-hari; setiap jawaban menyebutkan <b>peraturan atau halaman
-     sumbernya</b>.</p>
+  <p>An independent case study on public export and import information from
+     <b>Indonesia</b> and <b>Viet Nam</b>: customs, finance, trade and food and
+     drug rules, and the Vietnamese Official Gazette. Ask in everyday language;
+     every answer cites <b>the regulation or page it came from</b>.</p>
 </header>
 
 <main class="sheet">
 
-  <!-- ============================ kolom kiri ============================ -->
+  <!-- ============================ left column ============================ -->
   <div class="col">
 
     <section class="block">
-      <h2>Masalahnya</h2><div class="underline"></div>
+      <h2>The problem</h2><div class="underline"></div>
       <ul class="points">
         <li><span class="mark">—</span>
-          <span>Aturan ekspor-impor tersebar di <b>ribuan dokumen</b> pada
-          <b>18 kementerian dan lembaga</b>.</span></li>
+          <span>Export and import rules are spread over <b>thousands of
+          documents</b> across <b>18 ministries and agencies</b>: regulations,
+          procedures, permits, and service standards.</span></li>
         <li><span class="mark">—</span>
-          <span>Setiap barang punya <b>jalurnya sendiri</b>, aturan berubah
-          tanpa pemberitahuan, dan negara mitra menerbitkan aturannya
-          <b>dalam bahasa lain</b>.</span></li>
+          <span>Every product follows <b>its own path</b>, rules change
+          without notice, and the partner country publishes <b>in another
+          language</b>.</span></li>
       </ul>
     </section>
 
     <section class="block">
-      <h2>Cara kerjanya</h2><div class="underline"></div>
+      <h2>How it works</h2><div class="underline"></div>
       <div class="steps">
         <div class="step">
           <div class="num">1</div>
-          <div>Pilih <b>negara</b> yang aturannya ditanyakan, lalu ketik
-               pertanyaan dalam <b>bahasa Indonesia, Inggris, atau Vietnam</b>.</div>
+          <div>You choose <b>the country</b> whose rules you need, then ask in
+               <b>English, Indonesian or Vietnamese</b>.</div>
         </div>
         <div class="connector"></div>
         <div class="step">
           <div class="num">2</div>
-          <div>Sistem menelusuri <b>lebih dari 5.200 dokumen</b> resmi Indonesia
-               dan Vietnam, lalu merangkum yang paling relevan.</div>
+          <div>The system searches <b>over 5,200 official documents</b> from
+               Indonesia and Viet Nam and summarises the most relevant.</div>
         </div>
         <div class="connector"></div>
         <div class="step final">
           <div class="num">3</div>
-          <div>Sistem menampilkan <b>kartu bukti</b>: peraturan atau
-               halamannya, kutipan teksnya, dan tautan ke halaman asli di situs
-               resmi.</div>
+          <div>It shows <b>evidence cards</b>: the regulation or page, the
+               quoted passage, and a link to the original on the official
+               website.</div>
         </div>
       </div>
     </section>
 
     <section class="block">
-      <h2>Seperti ini hasilnya</h2><div class="underline"></div>
+      <h2>What you get</h2><div class="underline"></div>
       <div class="demo">
-        <div class="demo-q"><span class="dot"></span>Apa itu impor untuk dipakai dan dokumen apa yang diperlukan?</div>
+        <div class="demo-q"><span class="dot"></span>What is import for domestic use, and which document releases the goods?</div>
         <div class="demo-a">
-          Impor untuk dipakai adalah impor dengan tujuan untuk dipakai atau
-          dimiliki/dikuasai oleh orang yang berdomisili di Indonesia, diatur
-          dalam <b>PMK-190/PMK.04/2022</b> dan <span class="keep"><b>PER-02/BC/2023</b><span class="cite">1</span>.</span>
-          Barangnya dikeluarkan dengan <b>PIB</b> untuk setiap dokumen kontrak
-          pengangkutan, dan importir menghitung sendiri bea masuk, cukai,
-          dan/atau PDRI yang <span class="keep">terutang<span class="cite">2</span>.</span>
+          Import for domestic use is an import for use or ownership by a person
+          or company domiciled in Indonesia, governed by
+          <b>PMK-190/PMK.04/2022</b> and <span class="keep"><b>PER-02/BC/2023</b><span class="cite">1</span>.</span>
+          The goods are released with an import declaration (<b>PIB</b>) for
+          each transport document, and the importer calculates the duties and
+          taxes <span class="keep">owed<span class="cite">2</span>.</span>
         </div>
         <div class="demo-sources">
           <div class="demo-source"><span class="n">1</span>
@@ -598,120 +598,121 @@ h2 + .underline {
             <span><b>Impor Untuk Dipakai</b> — Impor · beacukai.go.id</span></div>
         </div>
       </div>
-      <p class="demo-caption">Contoh jawaban. Setiap kartu bukti menaut ke
-         halaman aslinya di beacukai.go.id.</p>
+      <p class="demo-caption">Example answer, translated from Indonesian. Each
+         evidence card links to the original page on beacukai.go.id.</p>
     </section>
 
     <section class="block">
-      <h2>Mengapa jawabannya bisa dipercaya</h2><div class="underline"></div>
+      <h2>Why you can trust the answers</h2><div class="underline"></div>
       <ul class="points checks">
         <li><span class="mark">&#10003;</span>
-          <span><b>Bisa langsung dicek.</b> Tiap kalimat ada nomor sumbernya,
-          dan halaman aslinya bisa dibuka saat itu juga.</span></li>
+          <span><b>Check it yourself.</b> Every sentence carries a source
+          number, and the original page opens right away.</span></li>
         <li><span class="mark">&#10003;</span>
-          <span><b>Tidak mengarang.</b> Jawaban disusun hanya dari dokumen yang
-          terindeks. Kalau tidak ada, sistem menjawab tidak ditemukan.</span></li>
+          <span><b>No making things up.</b> Answers come only from the indexed
+          documents. If it isn't there, the system says so.</span></li>
         <li><span class="mark">&#10003;</span>
-          <span><b>Salinan bertanggal.</b> Setiap halaman disimpan bersama
-          alamat aslinya dan tanggal pengambilannya.</span></li>
+          <span><b>Dated copies.</b> Every page is stored with its original
+          address and the date it was fetched.</span></li>
         <li><span class="mark">&#10003;</span>
-          <span><b>Data tetap di kantor.</b> Semua proses berjalan di komputer
-          Anda sendiri.</span></li>
+          <span><b>Data stays in the office.</b> Everything runs on your own
+          computer.</span></li>
       </ul>
     </section>
 
     <section class="block">
-      <h2>Teknologi di baliknya</h2><div class="underline"></div>
-      <p class="tech-lead">Sistem ini memakai <b>RAG</b> —
-         <i>Retrieval-Augmented Generation</i>: AI hanya boleh menjawab dari
-         dokumen yang ditemukan. Model AI-nya bisa diganti:</p>
+      <h2>The technology behind it</h2><div class="underline"></div>
+      <p class="tech-lead">The system uses <b>RAG</b> —
+         <i>Retrieval-Augmented Generation</i>: the AI may only answer from the
+         documents it finds. The AI model is interchangeable:</p>
       <div class="tech-opts">
-        <div class="tech-opt"><b>Lokal</b> — Qwen3 8B di komputer sendiri;
-          pertanyaan dan dokumen tidak keluar kantor.</div>
-        <div class="tech-opt"><b>Publik</b> — ChatGPT, Gemini, atau Claude,
-          bila ingin jawaban yang lebih tajam.</div>
+        <div class="tech-opt"><b>Local</b> — Qwen3 8B on your own computer;
+          questions and documents never leave the office.</div>
+        <div class="tech-opt"><b>Cloud</b> — ChatGPT, Gemini, or Claude, when
+          you want sharper answers.</div>
       </div>
     </section>
 
   </div>
 
-  <!-- ============================ kolom kanan =========================== -->
+  <!-- ============================ right column =========================== -->
   <div class="col">
 
     <section class="cta">
-      <div class="cta-kicker">Coba sekarang</div>
-      <div class="qr-frame"><img src="qr_code.png" alt="Kode QR menuju exim.ayolearn.stream"></div>
+      <div class="cta-kicker">Try it now</div>
+      <div class="qr-frame"><img src="qr_code.png" alt="QR code to exim.ayolearn.stream"></div>
       <div class="cta-url">https://exim.ayolearn.stream</div>
-      <div class="cta-hint">Pindai QR, atau ketik alamat di atas</div>
+      <div class="cta-hint">Scan the QR code, or type the address above</div>
       <hr>
       <div class="creds">
-        <div class="cred-row"><span>Nama pengguna</span><code>guest</code></div>
-        <div class="cred-row"><span>Kata sandi</span><code>i am guest</code></div>
+        <div class="cred-row"><span>Username</span><code>guest</code></div>
+        <div class="cred-row"><span>Password</span><code>i am guest</code></div>
       </div>
-      <div class="cta-note">Akun tamu boleh bertanya dan mengunduh dokumen yang disitasi.</div>
+      <div class="cta-note">The guest account can ask questions and download cited documents.</div>
     </section>
 
     <section class="block">
-      <h2>Contoh pertanyaan</h2><div class="underline"></div>
+      <h2>Try asking</h2><div class="underline"></div>
       <div class="asks">
-        <div class="ask">Apa saja fasilitas KITE bagi eksportir?</div>
-        <div class="ask">Apa aturan bea keluar minyak sawit mentah (CPO)?</div>
-        <div class="ask">Peraturan apa yang menetapkan tarif bea masuk dalam ASEAN Trade in Goods Agreement?</div>
+        <div class="ask">Which facilities does KITE give to exporters?</div>
+        <div class="ask">What are the rules for export duty on crude palm oil?</div>
+        <div class="ask">Which regulation sets import duty rates under the ASEAN Trade in Goods Agreement?</div>
       </div>
-      <p class="asks-note">Ketiganya sudah menemukan sumbernya di dokumen yang terindeks.</p>
+      <p class="asks-note">All three already find their sources in the indexed
+         documents.</p>
     </section>
 
     <section class="block">
-      <h2>Angka Kunci</h2><div class="underline"></div>
+      <h2>Key Numbers</h2><div class="underline"></div>
       <div class="stats">
         <div class="stat">
-          <div class="value">5.200+</div>
-          <div class="label">Dokumen terindeks, Indonesia dan Vietnam</div>
+          <div class="value">5,200+</div>
+          <div class="label">Documents indexed, Indonesia and Viet Nam</div>
         </div>
         <div class="stat">
-          <div class="value">177 ribu</div>
-          <div class="label">Potongan teks yang bisa dicari</div>
+          <div class="value">177K</div>
+          <div class="label">Searchable passages</div>
         </div>
         <div class="stat">
           <div class="value">3</div>
-          <div class="label">Bahasa: Indonesia, Inggris, Vietnam</div>
+          <div class="label">Languages: English, Indonesian, Vietnamese</div>
         </div>
       </div>
     </section>
 
     <section class="block">
-      <h2>Yang bisa dibaca</h2><div class="underline"></div>
+      <h2>What it can read</h2><div class="underline"></div>
       <div class="chips">
         <span class="chip">PDF</span>
         <span class="chip">Word</span>
         <span class="chip">Excel</span>
         <span class="chip">PowerPoint</span>
-        <span class="chip">Halaman web</span>
+        <span class="chip">Web pages</span>
         <span class="chip">CSV</span>
-        <span class="chip">Teks</span>
-        <span class="chip">Gambar &amp; pindaian (OCR)</span>
+        <span class="chip">Text</span>
+        <span class="chip">Images &amp; scans (OCR)</span>
       </div>
-      <p class="chips-sub">Demo ini mengindeks konten publik dari situs resmi
-         <b>Indonesia</b> dan <b>Vietnam</b>:</p>
+      <p class="chips-sub">This demo indexes public content from official
+         websites of <b>Indonesia</b> and <b>Viet Nam</b>:</p>
       <div class="chips">
-        <span class="chip ext">Prosedur</span>
+        <span class="chip ext">Procedures</span>
         <span class="chip ext">FAQ</span>
-        <span class="chip ext">Tarif &amp; kurs</span>
-        <span class="chip ext">PMK</span>
-        <span class="chip ext">SKA</span>
-        <span class="chip ext">Impor pangan &amp; obat (BPOM)</span>
-        <span class="chip ext">Công báo Vietnam</span>
+        <span class="chip ext">Tariffs &amp; rates</span>
+        <span class="chip ext">Finance regulations</span>
+        <span class="chip ext">Certificates of origin</span>
+        <span class="chip ext">Food &amp; drug imports</span>
+        <span class="chip ext">Vietnamese gazette</span>
       </div>
-      <p class="spec-line"><b>Spesifikasi:</b> Intel Core i7, VGA 8 GB, RAM
-         32 GB, penyimpanan 10 GB &mdash; <b>± Rp 20 juta</b> per unit.</p>
+      <p class="spec-line"><b>Specs:</b> Intel Core i7, 8 GB VGA, 32 GB RAM,
+         10 GB storage &mdash; <b>≈ IDR 20 million</b> per unit.</p>
     </section>
 
   </div>
 </main>
 
 <footer class="footer">
-  <div><b>Fakultas Sains dan Teknologi</b> &middot; Universitas Pradita &middot; alfa.ryano@pradita.ac.id</div>
-  <div>Studi kasus independen &middot; bukan layanan resmi instansi pemerintah mana pun</div>
+  <div><b>Faculty of Science and Technology</b> &middot; Pradita University &middot; alfa.ryano@pradita.ac.id</div>
+  <div>Independent case study &middot; not an official service of any government office</div>
 </footer>
 
 </body>
