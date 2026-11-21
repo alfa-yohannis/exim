@@ -38,7 +38,7 @@ from .extractors import EXTRACTOR_REGISTRY
 from .ingestion import AUTOMATIC_INGESTION, INGESTION_RUNNER, TEXT_EMBEDDER, AutomaticIngestion
 from .query_rewriting import QUERY_REWRITER
 from .rag import LANGUAGE_MODEL_FACTORY, QuestionRequest, RagEngine
-from .retrieval import CROSS_ENCODER_RERANKER, HybridRetriever
+from .retrieval import CROSS_ENCODER_RERANKER, QUERY_EMBEDDER, HybridRetriever
 from .safety import SOURCE_GUARD
 from .storage import DOCUMENT_CATALOGUE, VECTOR_INDEX
 
@@ -193,7 +193,7 @@ class RagWebApplication:
             settings=settings,
             catalogue=DOCUMENT_CATALOGUE,
             vector_index=VECTOR_INDEX,
-            embedder=TEXT_EMBEDDER,
+            embedder=QUERY_EMBEDDER,
             reranker=CROSS_ENCODER_RERANKER,
         )
         self._engine = RagEngine(
@@ -421,8 +421,10 @@ class RagWebApplication:
                 },
                 "models": {
                     "embedding_model": self._settings.embedding_model_name,
-                    "embedding_device": TEXT_EMBEDDER.device,
-                    "embedding_loaded": TEXT_EMBEDDER.is_loaded,
+                    "embedding_device": QUERY_EMBEDDER.device,
+                    "embedding_loaded": QUERY_EMBEDDER.is_loaded,
+                    "indexing_embedding_device": TEXT_EMBEDDER.device,
+                    "reranking_backend": CROSS_ENCODER_RERANKER.backend_name,
                     "reranking_model": self._settings.reranking_model_name,
                     "reranking_enabled": CROSS_ENCODER_RERANKER.is_enabled,
                     "reranking_loaded": CROSS_ENCODER_RERANKER.is_loaded,
