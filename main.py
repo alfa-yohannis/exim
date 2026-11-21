@@ -122,6 +122,10 @@ class CommandLineInterface:
             "convert-reranker",
             help="Buat model reranking OpenVINO int8 (sekali saja; RERANK_BACKEND=openvino)",
         )
+        subparsers.add_parser(
+            "convert-embedder",
+            help="Buat model embedding pertanyaan OpenVINO int8 (sekali saja; QUERY_EMBED_BACKEND=openvino)",
+        )
         subparsers.add_parser("status", help="Tampilkan ringkasan indeks dan backend")
         subparsers.add_parser(
             "hash-password", help="Buat hash kata sandi untuk ADMIN_ atau GUEST_PASSWORD_HASH"
@@ -143,6 +147,7 @@ class CommandLineInterface:
             "crawl": self._run_crawl,
             "hash-password": self._run_hash_password,
             "convert-reranker": self._run_convert_reranker,
+            "convert-embedder": self._run_convert_embedder,
         }
         return handlers[command](parsed)
 
@@ -204,6 +209,12 @@ class CommandLineInterface:
     def _run_convert_reranker(self, _parsed: argparse.Namespace) -> int:
         """Build the int8 OpenVINO reranker into RERANK_OPENVINO_DIR."""
         from evaluation.openvino_reranker import convert_for_app
+
+        return convert_for_app()
+
+    def _run_convert_embedder(self, _parsed: argparse.Namespace) -> int:
+        """Build the int8 OpenVINO question encoder into QUERY_EMBED_OPENVINO_DIR."""
+        from evaluation.openvino_embedder import convert_for_app
 
         return convert_for_app()
 
